@@ -6,6 +6,8 @@ import { Comparison } from "@/components/landing/Comparison";
 import { WizardContainer } from "@/components/landing/WizardContainer";
 import { Footer } from "@/components/landing/Footer";
 import { PeekingMime } from "@/components/landing/PeekingMime";
+import { MimeEyes } from "@/components/landing/MimeEyes";
+import { MimeDivider } from "@/components/landing/MimeDivider";
 
 const Index = () => {
   const mimeTrackRef = useRef<HTMLDivElement>(null);
@@ -19,10 +21,12 @@ const Index = () => {
           <HowItWorks />
           <PeekingMime trackRef={mimeTrackRef} />
           <Comparison />
+          <MimeDivider />
           <WizardContainer />
         </div>
       </main>
       <Footer />
+      <MimeEyes />
     </div>
   );
 };
