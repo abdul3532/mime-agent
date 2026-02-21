@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
 } from "lucide-react";
@@ -38,37 +39,47 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-60 shrink-0 flex-col hero-gradient text-primary-foreground">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col hero-gradient text-primary-foreground">
         <div className="p-5 border-b border-primary-foreground/10">
-          <button onClick={() => navigate("/")} className="flex items-center gap-2 text-sm opacity-70 hover:opacity-100 transition-opacity mb-3">
-            <ArrowLeft className="h-4 w-4" /> Back to home
+          <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs opacity-60 hover:opacity-100 transition-all duration-200 mb-4 hover:translate-x-[-2px]">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to home
           </button>
-          <span className="font-heading text-xl font-extrabold">MIME</span>
+          <span className="font-heading text-2xl font-extrabold tracking-tight">MIME</span>
+          <p className="text-xs opacity-50 mt-1">Storefront Manager</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium relative ${
                 activeTab === t.id
                   ? "bg-primary-foreground/15 text-primary-foreground"
-                  : "text-primary-foreground/60 hover:text-primary-foreground/90 hover:bg-primary-foreground/5"
+                  : "text-primary-foreground/50 hover:text-primary-foreground/90 hover:bg-primary-foreground/5"
               }`}
             >
+              {activeTab === t.id && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-accent"
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                />
+              )}
               <t.icon className="h-4 w-4" />
               {t.label}
             </button>
           ))}
         </nav>
+        <div className="p-4 border-t border-primary-foreground/10">
+          <div className="text-xs opacity-40">v1.0 beta</div>
+        </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-14 border-b bg-card flex items-center justify-between px-4 md:px-6 shrink-0">
+        <header className="h-14 border-b bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-3">
-            {/* Mobile nav */}
             <select
               className="md:hidden bg-transparent text-sm font-medium border rounded px-2 py-1"
               value={activeTab}
@@ -79,25 +90,35 @@ const Dashboard = () => {
               ))}
             </select>
             <span className="hidden md:inline text-sm font-semibold">{storeName}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
               status === "draft" ? "status-draft" :
               status === "published" ? "status-published" : "status-verified"
             }`}>
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </span>
           </div>
-          <Button size="sm" variant="outline" onClick={handleRescan}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Re-scan
+          <Button size="sm" variant="outline" onClick={handleRescan} className="group">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5 transition-transform group-hover:rotate-180 duration-500" /> Re-scan
           </Button>
         </header>
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {activeTab === "overview" && <OverviewSection />}
-          {activeTab === "products" && <ProductsSection />}
-          {activeTab === "rules" && <RulesSection />}
-          {activeTab === "preview" && <PreviewSection storeId={storeId} />}
-          {activeTab === "publish" && <PublishSection storeId={storeId} />}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === "overview" && <OverviewSection />}
+              {activeTab === "products" && <ProductsSection />}
+              {activeTab === "rules" && <RulesSection />}
+              {activeTab === "preview" && <PreviewSection storeId={storeId} />}
+              {activeTab === "publish" && <PublishSection storeId={storeId} />}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

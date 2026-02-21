@@ -6,34 +6,24 @@
   :root {
     --background: 40 25% 97%;
     --foreground: 222 47% 11%;
-
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-
     --primary: 222 72% 22%;
     --primary-foreground: 0 0% 100%;
-
     --secondary: 220 20% 94%;
     --secondary-foreground: 222 47% 11%;
-
     --muted: 220 15% 92%;
     --muted-foreground: 220 10% 45%;
-
     --accent: 45 95% 55%;
     --accent-foreground: 222 72% 15%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 220 15% 90%;
     --input: 220 15% 90%;
     --ring: 222 72% 22%;
-
     --radius: 0.75rem;
-
     --sidebar-background: 222 72% 22%;
     --sidebar-foreground: 220 20% 94%;
     --sidebar-primary: 45 95% 55%;
@@ -42,13 +32,13 @@
     --sidebar-accent-foreground: 220 20% 94%;
     --sidebar-border: 222 50% 30%;
     --sidebar-ring: 45 95% 55%;
-
-    /* Custom tokens */
     --surface: 0 0% 100%;
     --surface-raised: 220 20% 98%;
     --hero-gradient-start: 222 72% 18%;
     --hero-gradient-end: 222 60% 28%;
     --glow-yellow: 45 95% 55%;
+    --success: 152 60% 42%;
+    --success-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -79,6 +69,8 @@
     --sidebar-accent-foreground: 220 20% 90%;
     --sidebar-border: 222 30% 15%;
     --sidebar-ring: 45 95% 55%;
+    --success: 152 50% 35%;
+    --success-foreground: 0 0% 100%;
   }
 }
 
@@ -86,11 +78,9 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
-
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Plus Jakarta Sans', sans-serif;
     @apply font-bold tracking-tight;
@@ -111,23 +101,40 @@
   }
 
   .card-elevated {
-    @apply bg-card rounded-xl border shadow-sm hover:shadow-md transition-shadow duration-200;
+    @apply bg-card rounded-xl border shadow-sm transition-all duration-300;
+  }
+  .card-elevated:hover {
+    @apply shadow-lg;
+    transform: translateY(-2px);
+  }
+
+  .card-interactive {
+    @apply bg-card rounded-xl border shadow-sm transition-all duration-300 cursor-pointer;
+  }
+  .card-interactive:hover {
+    @apply shadow-xl border-primary/30;
+    transform: translateY(-4px);
+  }
+
+  .card-glass {
+    @apply rounded-xl border backdrop-blur-sm;
+    background: hsl(var(--card) / 0.8);
   }
 
   .step-locked {
-    @apply opacity-50 pointer-events-none;
+    @apply opacity-40 pointer-events-none;
   }
-
   .step-active {
     @apply ring-2 ring-primary/20;
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.05), 0 8px 30px -10px hsl(var(--primary) / 0.15);
   }
-
   .step-completed {
     @apply border-accent/40;
   }
 
   .code-block {
-    @apply bg-foreground/5 rounded-lg p-4 font-mono text-sm overflow-x-auto border;
+    @apply rounded-lg p-4 font-mono text-sm overflow-x-auto border;
+    background: hsl(var(--foreground) / 0.04);
   }
 
   .progress-fill {
@@ -136,9 +143,13 @@
 
   .chip {
     @apply inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border cursor-pointer
-           hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors;
+           transition-all duration-200;
   }
-
+  .chip:hover {
+    @apply bg-primary text-primary-foreground border-primary;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px hsl(var(--primary) / 0.2);
+  }
   .chip-selected {
     @apply bg-primary text-primary-foreground border-primary;
   }
@@ -146,12 +157,99 @@
   .status-draft {
     @apply bg-muted text-muted-foreground;
   }
-
   .status-published {
     @apply bg-accent/20 text-accent-foreground;
   }
-
   .status-verified {
-    @apply bg-green-100 text-green-800;
+    background: hsl(var(--success) / 0.15);
+    color: hsl(var(--success));
+  }
+
+  /* Grid pattern background */
+  .grid-pattern {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Floating orbs */
+  .orb {
+    @apply absolute rounded-full pointer-events-none;
+    filter: blur(80px);
+    animation: orb-float 20s ease-in-out infinite;
+  }
+
+  @keyframes orb-float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(30px, -20px) scale(1.05); }
+    50% { transform: translate(-10px, 20px) scale(0.95); }
+    75% { transform: translate(20px, 10px) scale(1.02); }
+  }
+
+  /* Glow button */
+  .btn-glow {
+    @apply relative overflow-hidden;
+    transition: all 0.3s ease;
+  }
+  .btn-glow::after {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+    background: linear-gradient(135deg, hsl(var(--accent) / 0.3), transparent);
+  }
+  .btn-glow:hover::after {
+    @apply opacity-100;
+  }
+  .btn-glow:hover {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.1);
+    transform: translateY(-1px);
+  }
+
+  /* Shimmer line */
+  .shimmer-line {
+    @apply relative overflow-hidden;
+  }
+  .shimmer-line::after {
+    content: '';
+    @apply absolute top-0 left-0 w-full h-full;
+    background: linear-gradient(90deg, transparent, hsl(var(--accent) / 0.3), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+    background-size: 200% 100%;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Pulse dot */
+  .pulse-dot {
+    @apply relative;
+  }
+  .pulse-dot::after {
+    content: '';
+    @apply absolute inset-0 rounded-full;
+    background: inherit;
+    animation: pulse-ring 2s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+
+  /* Dashboard row hover */
+  .row-hover {
+    @apply transition-all duration-200;
+  }
+  .row-hover:hover {
+    background: hsl(var(--primary) / 0.03);
+    transform: scale(1.005);
+  }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply transition-all duration-200;
+  }
+  .nav-item:hover {
+    transform: translateX(4px);
   }
 }
