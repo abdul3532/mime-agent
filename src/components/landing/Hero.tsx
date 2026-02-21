@@ -1,6 +1,7 @@
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Zap, ShieldCheck, SlidersHorizontal, Globe, CheckCircle2 } from "lucide-react";
+import { Zap, ShieldCheck, SlidersHorizontal, Globe, CheckCircle2, ArrowRight } from "lucide-react";
 
 const benefits = [
   { icon: Zap, title: "Faster discovery", desc: "Less crawling, instant structured data" },
@@ -11,68 +12,103 @@ const benefits = [
 ];
 
 export function Hero() {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  const y = useTransform(scrollYProgress, [0, 1], [0, 150]);
+  const opacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
+
   const scrollTo = (id: string) =>
     document.querySelector(id)?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <section id="hero" className="relative overflow-hidden pt-28 pb-20 md:pt-36 md:pb-28">
-      {/* Subtle background accent */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-accent/10 blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+    <section ref={ref} id="hero" className="relative overflow-hidden pt-28 pb-20 md:pt-40 md:pb-32">
+      {/* Animated background */}
+      <div className="absolute inset-0 grid-pattern opacity-50" />
+      <div className="orb w-[600px] h-[600px] bg-accent/8 top-[-200px] right-[-100px]" />
+      <div className="orb w-[400px] h-[400px] bg-primary/6 bottom-[-100px] left-[-100px]" style={{ animationDelay: "-7s" }} />
 
-      <div className="container mx-auto px-4 relative">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="max-w-3xl mx-auto text-center"
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/15 text-accent-foreground text-sm font-medium mb-6">
-            <span className="w-2 h-2 rounded-full bg-accent" />
-            Building the commerce layer for the agentic economy
-          </div>
-
-          <h1 className="font-heading text-4xl md:text-6xl font-extrabold leading-tight mb-6">
-            MIME makes your store{" "}
-            <span className="text-primary">readable for AI agents.</span>
-          </h1>
-
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            One installation. One structured storefront. Reliable discovery for agentic commerce.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-16">
-            <Button size="lg" onClick={() => scrollTo("#wizard")}>
-              Start demo
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => scrollTo("#wizard")}>
-              View dashboard
-            </Button>
-          </div>
-        </motion.div>
-
+      <motion.div style={{ y, opacity, scale }} className="container mx-auto px-4 relative">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 max-w-5xl mx-auto"
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="max-w-3xl mx-auto text-center"
         >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/15 text-accent-foreground text-sm font-medium mb-8 border border-accent/20"
+          >
+            <span className="w-2 h-2 rounded-full bg-accent pulse-dot" />
+            Building the commerce layer for the agentic economy
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.3 }}
+            className="font-heading text-4xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] mb-6"
+          >
+            MIME makes your store{" "}
+            <span className="relative inline-block">
+              <span className="text-primary">readable for AI agents</span>
+              <motion.span
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 0.8, delay: 1 }}
+                className="absolute -bottom-1 left-0 right-0 h-1 bg-accent/40 rounded-full origin-left"
+              />
+            </span>
+            .
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
+          >
+            One installation. One structured storefront. Reliable discovery for agentic commerce.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+            className="flex flex-col sm:flex-row gap-3 justify-center mb-20"
+          >
+            <Button size="lg" onClick={() => scrollTo("#wizard")} className="btn-glow group">
+              Start demo
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => scrollTo("#wizard")} className="group">
+              View dashboard
+            </Button>
+          </motion.div>
+        </motion.div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 max-w-5xl mx-auto">
           {benefits.map((b, i) => (
             <motion.div
               key={b.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 + i * 0.08 }}
-              className="card-elevated p-5 text-center"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              whileHover={{ y: -6, transition: { duration: 0.2 } }}
+              className="card-elevated p-5 text-center group"
             >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                <b.icon className="h-5 w-5 text-primary" />
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:bg-primary group-hover:shadow-lg group-hover:scale-110">
+                <b.icon className="h-5 w-5 text-primary transition-colors duration-300 group-hover:text-primary-foreground" />
               </div>
               <h3 className="text-sm font-semibold mb-1">{b.title}</h3>
               <p className="text-xs text-muted-foreground">{b.desc}</p>
             </motion.div>
           ))}
-        </motion.div>
-      </div>
+        </div>
+      </motion.div>
     </section>
   );
 }
