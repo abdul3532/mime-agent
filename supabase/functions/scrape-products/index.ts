@@ -28,15 +28,15 @@ Deno.serve(async (req) => {
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !data?.claims?.sub) {
-      console.error("Auth failed:", claimsError?.message);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      console.error("Auth failed:", userError?.message || "No user");
+      return new Response(JSON.stringify({ error: "Unauthorized", detail: userError?.message }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = data.claims.sub as string;
+    const userId = user.id;
 
     const { url } = await req.json();
     if (!url) {
