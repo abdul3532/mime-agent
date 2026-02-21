@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Lock, Circle, Sparkles } from "lucide-react";
+import { CheckCircle2, Lock, Circle, Sparkles, ChevronLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { StepUrl } from "./steps/StepUrl";
 import { StepChat } from "./steps/StepChat";
 import { StepCrawl } from "./steps/StepCrawl";
@@ -39,6 +40,14 @@ export function WizardContainer() {
     const next = currentStep + 1;
     setCurrentStep(next);
     scrollToStep(next);
+  };
+
+  const goBack = () => {
+    if (currentStep > 0) {
+      const prev = currentStep - 1;
+      setCurrentStep(prev);
+      scrollToStep(prev);
+    }
   };
 
   useEffect(() => {
@@ -103,16 +112,17 @@ export function WizardContainer() {
               {stepLabels.map((label, i) => {
                 const status = getStatus(i);
                 return (
-                  <motion.div
+                  <motion.button
                     key={i}
+                    onClick={() => { if (status === "completed") { setCurrentStep(i); scrollToStep(i); } }}
                     animate={{
                       opacity: status === "locked" ? 0.4 : 1,
                       x: status === "active" ? 4 : 0,
                     }}
                     transition={{ duration: 0.3 }}
-                    className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors w-full text-left ${
                       status === "active" ? "bg-primary/10 text-primary" :
-                      status === "completed" ? "text-accent-foreground" : "text-muted-foreground"
+                      status === "completed" ? "text-accent-foreground hover:bg-accent/10 cursor-pointer" : "text-muted-foreground cursor-default"
                     }`}
                   >
                     {status === "completed" ? (
@@ -128,7 +138,7 @@ export function WizardContainer() {
                       <Lock className="h-5 w-5 shrink-0" />
                     )}
                     <span>{label}</span>
-                  </motion.div>
+                  </motion.button>
                 );
               })}
             </div>
@@ -145,11 +155,12 @@ export function WizardContainer() {
                   </motion.div>
                 )}
                 {currentStep > 0 && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.7 }} className="card-elevated p-4 step-completed border-accent/40">
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.7 }} whileHover={{ opacity: 1 }} onClick={() => { setCurrentStep(0); scrollToStep(0); }} className="card-elevated p-4 step-completed border-accent/40 cursor-pointer hover:border-primary/40 transition-colors">
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-accent" />
                       <span className="font-medium">Store connected</span>
                       <span className="text-muted-foreground ml-auto text-xs">{storeUrl}</span>
+                      <ChevronLeft className="h-3 w-3 text-muted-foreground" />
                     </div>
                   </motion.div>
                 )}
@@ -159,14 +170,18 @@ export function WizardContainer() {
               <div ref={(el) => (stepRefs.current[1] = el)}>
                 {currentStep === 1 && (
                   <motion.div key="step2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-6 step-active">
+                    <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                    </Button>
                     <StepChat onComplete={advanceStep} />
                   </motion.div>
                 )}
                 {currentStep > 1 && (
-                  <div className="card-elevated p-4 step-completed border-accent/40 opacity-70">
+                  <div onClick={() => { setCurrentStep(1); scrollToStep(1); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-accent" />
                       <span className="font-medium">Priorities configured</span>
+                      <ChevronLeft className="h-3 w-3 text-muted-foreground ml-auto" />
                     </div>
                   </div>
                 )}
@@ -184,14 +199,18 @@ export function WizardContainer() {
               <div ref={(el) => (stepRefs.current[2] = el)}>
                 {currentStep === 2 && (
                   <motion.div key="step3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-6 step-active">
+                    <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                    </Button>
                     <StepCrawl storeUrl={storeUrl} onComplete={advanceStep} />
                   </motion.div>
                 )}
                 {currentStep > 2 && (
-                  <div className="card-elevated p-4 step-completed border-accent/40 opacity-70">
+                  <div onClick={() => { setCurrentStep(2); scrollToStep(2); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-accent" />
                       <span className="font-medium">Scan complete — 58 products indexed</span>
+                      <ChevronLeft className="h-3 w-3 text-muted-foreground ml-auto" />
                     </div>
                   </div>
                 )}
@@ -209,6 +228,9 @@ export function WizardContainer() {
               <div ref={(el) => (stepRefs.current[3] = el)}>
                 {currentStep === 3 && (
                   <motion.div key="step4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-6 step-active">
+                    <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                    </Button>
                     <StepInstall storeId={storeId} />
                   </motion.div>
                 )}
