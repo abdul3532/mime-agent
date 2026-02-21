@@ -185,6 +185,7 @@ export function ProductsSection() {
                       <img
                         src={p.image}
                         alt={p.title}
+                        loading="lazy"
                         className="w-8 h-8 rounded object-cover shrink-0 bg-muted"
                         onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
                       />
@@ -195,7 +196,7 @@ export function ProductsSection() {
                     <span className="font-medium truncate max-w-[180px]">{p.title}</span>
                   </div>
                 </td>
-                <td className="p-3 font-medium">€{p.price}</td>
+                <td className="p-3 font-medium">{new Intl.NumberFormat(undefined, { style: 'currency', currency: p.currency || 'EUR' }).format(p.price)}</td>
                 <td className="p-3 hidden md:table-cell">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     p.availability === "in_stock" ? "bg-green-100 text-green-700" :
