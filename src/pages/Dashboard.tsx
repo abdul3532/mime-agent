@@ -8,12 +8,13 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DashboardProvider, useDashboard } from "@/context/DashboardContext";
 import { OverviewSection } from "@/components/dashboard/OverviewSection";
 import { ProductsSection } from "@/components/dashboard/ProductsSection";
 import { RulesSection } from "@/components/dashboard/RulesSection";
 import { PreviewSection } from "@/components/dashboard/PreviewSection";
 import { PublishSection } from "@/components/dashboard/PublishSection";
+import { GlobalSearchCommand } from "@/components/dashboard/GlobalSearchCommand";
 import { useToast } from "@/hooks/use-toast";
 
 const navGroups = [
@@ -41,9 +42,10 @@ const navGroups = [
 
 const allTabs = navGroups.flatMap((g) => g.items);
 
-const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState("overview");
+function DashboardInner() {
+  const { activeTab, setActiveTab } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
+  const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggle } = useTheme();
@@ -60,6 +62,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
+      <GlobalSearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
+
       {/* Sidebar */}
       <aside className="hidden md:flex w-60 shrink-0 flex-col bg-card border-r border-border/50">
         <div className="p-5 border-b border-border/50">
@@ -130,14 +134,13 @@ const Dashboard = () => {
                 <option key={t.id} value={t.id}>{t.label}</option>
               ))}
             </select>
-            <div className="hidden md:flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-1.5">
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="hidden md:flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-1.5 hover:bg-muted/50 transition-colors cursor-pointer"
+            >
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search products, rules..."
-                className="bg-transparent text-sm border-none outline-none placeholder:text-muted-foreground/50 w-52"
-              />
-            </div>
+              <span className="text-sm text-muted-foreground/50 w-52 text-left">Search products, rules... ⌘K</span>
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden md:inline text-xs text-muted-foreground">{storeName}</span>
@@ -180,6 +183,12 @@ const Dashboard = () => {
       </div>
     </div>
   );
-};
+}
+
+const Dashboard = () => (
+  <DashboardProvider>
+    <DashboardInner />
+  </DashboardProvider>
+);
 
 export default Dashboard;

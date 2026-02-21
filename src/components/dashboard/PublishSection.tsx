@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Copy, CheckCircle2, XCircle, Rocket } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PublishConfirmDialog } from "./PublishConfirmDialog";
 
 interface Props {
   storeId: string;
@@ -14,6 +15,7 @@ export function PublishSection({ storeId }: Props) {
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const endpoint = `https://mime.ai/storefront/${storeId}/agent.json`;
   const snippet = `<link rel="alternate" type="application/json" href="${endpoint}" />`;
@@ -32,6 +34,7 @@ export function PublishSection({ storeId }: Props) {
   };
 
   const handlePublish = () => {
+    setConfirmOpen(false);
     setPublishing(true);
     setTimeout(() => {
       setPublishing(false);
@@ -91,10 +94,12 @@ export function PublishSection({ storeId }: Props) {
       </div>
 
       {/* Publish */}
-      <Button onClick={handlePublish} className="w-full h-11" disabled={publishing}>
+      <Button onClick={() => setConfirmOpen(true)} className="w-full h-11" disabled={publishing}>
         <Rocket className="h-4 w-4 mr-2" />
         {publishing ? "Publishing..." : "Publish changes"}
       </Button>
+
+      <PublishConfirmDialog open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={handlePublish} />
     </div>
   );
 }
