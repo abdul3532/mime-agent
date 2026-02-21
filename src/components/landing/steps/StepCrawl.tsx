@@ -37,11 +37,6 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       setError(null);
       setNeedsAuth(false);
 
-      if (!user) {
-        setNeedsAuth(true);
-        return;
-      }
-
       const stageTimer = setInterval(() => {
         setStage((prev) => (prev < 2 ? prev + 1 : prev));
       }, 5000);
