@@ -1,0 +1,189 @@
+import { useState, useMemo } from "react";
+import { mockProducts, Product, getCategories } from "@/data/mockProducts";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 10;
+
+export function ProductsSection() {
+  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [availFilter, setAvailFilter] = useState<string>("all");
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
+  const categories = getCategories();
+
+  const filtered = useMemo(() => {
+    return products.filter((p) => {
+      if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      if (availFilter !== "all" && p.availability !== availFilter) return false;
+      return true;
+    });
+  }, [products, search, categoryFilter, availFilter]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const pageProducts = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const toggleSelect = (id: string) => {
+    const s = new Set(selected);
+    s.has(id) ? s.delete(id) : s.add(id);
+    setSelected(s);
+  };
+
+  const toggleAll = () => {
+    if (selected.size === pageProducts.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(pageProducts.map((p) => p.id)));
+    }
+  };
+
+  const bulkAction = (action: string) => {
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (!selected.has(p.id)) return p;
+        switch (action) {
+          case "include": return { ...p, included: true };
+          case "exclude": return { ...p, included: false };
+          case "boost": return { ...p, boostScore: Math.min(p.boostScore + 2, 10) };
+          case "demote": return { ...p, boostScore: Math.max(p.boostScore - 2, 0) };
+          default: return p;
+        }
+      })
+    );
+    toast({ title: "Updated", description: `${selected.size} products updated.` });
+    setSelected(new Set());
+  };
+
+  const updateBoost = (id: string, val: number) => {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, boostScore: val } : p)));
+  };
+
+  const availLabel = (a: string) => {
+    if (a === "in_stock") return "In stock";
+    if (a === "low_stock") return "Low stock";
+    return "Out of stock";
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="font-heading text-2xl font-bold">Products</h2>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search products..." className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} />
+        </div>
+        <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(0); }}>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={availFilter} onValueChange={(v) => { setAvailFilter(v); setPage(0); }}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Availability" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="in_stock">In stock</SelectItem>
+            <SelectItem value="low_stock">Low stock</SelectItem>
+            <SelectItem value="out_of_stock">Out of stock</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Bulk actions */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">{selected.size} selected</span>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("include")}>Include</Button>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("exclude")}>Exclude</Button>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("boost")}>Boost +2</Button>
+          <Button size="sm" variant="outline" onClick={() => bulkAction("demote")}>Demote −2</Button>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="card-elevated overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="p-3 w-10">
+                <Checkbox checked={selected.size === pageProducts.length && pageProducts.length > 0} onCheckedChange={toggleAll} />
+              </th>
+              <th className="p-3">Product</th>
+              <th className="p-3">Price</th>
+              <th className="p-3 hidden md:table-cell">Availability</th>
+              <th className="p-3 hidden lg:table-cell">Category</th>
+              <th className="p-3 hidden lg:table-cell">Margin</th>
+              <th className="p-3 hidden lg:table-cell">Inventory</th>
+              <th className="p-3 w-36">Boost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageProducts.map((p) => (
+              <tr key={p.id} className={`border-b hover:bg-muted/30 transition-colors ${!p.included ? "opacity-40" : ""}`}>
+                <td className="p-3">
+                  <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleSelect(p.id)} />
+                </td>
+                <td className="p-3">
+                  <div className="flex items-center gap-3">
+                    <img src={p.image} alt={p.title} className="w-8 h-8 rounded object-cover shrink-0" />
+                    <span className="font-medium truncate max-w-[180px]">{p.title}</span>
+                  </div>
+                </td>
+                <td className="p-3 font-medium">€{p.price}</td>
+                <td className="p-3 hidden md:table-cell">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    p.availability === "in_stock" ? "bg-green-100 text-green-700" :
+                    p.availability === "low_stock" ? "bg-yellow-100 text-yellow-700" :
+                    "bg-red-100 text-red-700"
+                  }`}>
+                    {availLabel(p.availability)}
+                  </span>
+                </td>
+                <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.category}</td>
+                <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.margin}%</td>
+                <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.inventory}</td>
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    <Slider
+                      value={[p.boostScore]}
+                      onValueChange={([v]) => updateBoost(p.id, v)}
+                      min={0} max={10} step={1}
+                      className="w-20"
+                    />
+                    <span className="text-xs font-mono w-4">{p.boostScore}</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">{filtered.length} products</span>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span>{page + 1} / {totalPages}</span>
+          <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
