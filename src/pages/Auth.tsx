@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
 import mimeLogo from "@/assets/mime-logo.png";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function Auth() {
+  const { user, loading: authLoading } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +24,14 @@ export default function Auth() {
   // If user was in the wizard, redirect back there after sign-in
   const wizardStep = localStorage.getItem("mime_wizard_step");
   const redirectTo = wizardStep && parseInt(wizardStep) > 0 ? "/#wizard" : "/dashboard";
+
+  // If already logged in, redirect immediately
+  if (authLoading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>;
+  }
+  if (user) {
+    return <Navigate to={redirectTo} replace />;
+  }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
