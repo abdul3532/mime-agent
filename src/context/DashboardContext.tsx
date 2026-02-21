@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { Product, mockProducts } from "@/data/mockProducts";
+import { Product } from "@/data/mockProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -31,16 +31,11 @@ interface DashboardContextType {
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
 
-const defaultRules: Rule[] = [
-  { id: "r1", name: "Bestsellers first", field: "tags", condition: "contains", value: "bestseller", action: "boost", amount: 3 },
-  { id: "r2", name: "Exclude out-of-stock", field: "availability", condition: "equals", value: "out_of_stock", action: "exclude", amount: 0 },
-];
-
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [rules, setRules] = useState<Rule[]>(defaultRules);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
@@ -56,7 +51,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         .eq("user_id", user.id)
         .order("created_at");
 
-      if (dbProducts && dbProducts.length > 0) {
+      if (dbProducts) {
         setProducts(dbProducts.map((p) => ({
           id: p.id,
           title: p.title,
@@ -65,69 +60,22 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           availability: p.availability as Product["availability"],
           category: p.category,
           tags: p.tags || [],
-          margin: 0, // not stored in DB, computed or mock
+          margin: 0,
           inventory: p.inventory,
           url: p.url || "",
           image: p.image || "",
           boostScore: p.boost_score,
           included: p.included,
         })));
-      } else {
-        // First time: seed with mock data
-        const inserts = mockProducts.map((p) => ({
-          user_id: user.id,
-          title: p.title,
-          price: p.price,
-          currency: p.currency,
-          availability: p.availability,
-          category: p.category,
-          tags: p.tags,
-          inventory: p.inventory,
-          url: p.url,
-          image: p.image,
-          boost_score: p.boostScore,
-          included: p.included,
-        }));
-        const { data: seeded } = await supabase.from("products").insert(inserts).select();
-        if (seeded) {
-          setProducts(seeded.map((p) => ({
-            id: p.id,
-            title: p.title,
-            price: Number(p.price),
-            currency: p.currency,
-            availability: p.availability as Product["availability"],
-            category: p.category,
-            tags: p.tags || [],
-            margin: 0,
-            inventory: p.inventory,
-            url: p.url || "",
-            image: p.image || "",
-            boostScore: p.boost_score,
-            included: p.included,
-          })));
-        }
       }
 
       // Load rules
       const { data: dbRules } = await supabase.from("rules").select("*").eq("user_id", user.id);
-      if (dbRules && dbRules.length > 0) {
+      if (dbRules) {
         setRules(dbRules.map((r) => ({
           id: r.id, name: r.name, field: r.field, condition: r.condition,
           value: r.value, action: r.action, amount: r.amount,
         })));
-      } else {
-        // Seed default rules
-        const ruleInserts = defaultRules.map((r) => ({
-          user_id: user.id, name: r.name, field: r.field, condition: r.condition,
-          value: r.value, action: r.action, amount: r.amount,
-        }));
-        const { data: seededRules } = await supabase.from("rules").insert(ruleInserts).select();
-        if (seededRules) {
-          setRules(seededRules.map((r) => ({
-            id: r.id, name: r.name, field: r.field, condition: r.condition,
-            value: r.value, action: r.action, amount: r.amount,
-          })));
-        }
       }
 
       setLoading(false);

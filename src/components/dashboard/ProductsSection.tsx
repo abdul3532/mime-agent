@@ -22,7 +22,7 @@ export function ProductsSection() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const { toast } = useToast();
-  const categories = getCategories();
+  const categories = getCategories(products);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {

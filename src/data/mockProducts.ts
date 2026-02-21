@@ -69,5 +69,5 @@ export const mockProducts: Product[] = productData.map((p, i) => ({
   included: p.availability !== "out_of_stock",
 }));
 
-export const getCategories = () => [...new Set(mockProducts.map((p) => p.category))];
-export const getTags = () => [...new Set(mockProducts.flatMap((p) => p.tags))];
+export const getCategories = (products?: Product[]) => [...new Set((products || []).map((p) => p.category))];
+export const getTags = (products?: Product[]) => [...new Set((products || []).flatMap((p) => p.tags))];

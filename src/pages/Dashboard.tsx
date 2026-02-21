@@ -47,9 +47,9 @@ function DashboardInner() {
   const { toast } = useToast();
   const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
-  const storeUrl = localStorage.getItem("mime_store_url") || "https://example-store.com";
-  const storeId = localStorage.getItem("mime_store_id") || "store_demo123";
-  const storeName = new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname;
+  const storeUrl = localStorage.getItem("mime_store_url") || "";
+  const storeId = localStorage.getItem("mime_store_id") || "";
+  const storeName = storeUrl ? new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname : "No store connected";
 
   const handleRescan = () => {
     toast({ title: "Re-scanning...", description: "This will take a few seconds." });
