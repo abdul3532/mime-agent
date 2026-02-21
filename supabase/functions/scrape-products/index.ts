@@ -11,6 +11,24 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Admin client for progress updates (bypasses RLS)
+  const adminClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  let runId: string | null = null;
+  let userId: string | null = null;
+
+  async function updateProgress(updates: Record<string, unknown>) {
+    if (!runId || !userId) return;
+    await adminClient
+      .from("scrape_progress")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("run_id", runId)
+      .eq("user_id", userId);
+  }
+
   try {
     // Auth
     const authHeader = req.headers.get("Authorization");
@@ -36,9 +54,12 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = user.id;
+    userId = user.id;
 
-    const { url } = await req.json();
+    const body = await req.json();
+    const { url } = body;
+    runId = body.runId || crypto.randomUUID();
+
     if (!url) {
       return new Response(JSON.stringify({ error: "URL is required" }), {
         status: 400,
@@ -67,6 +88,16 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    // Create progress row
+    await adminClient.from("scrape_progress").insert({
+      user_id: userId,
+      run_id: runId,
+      status: "mapping",
+      total_urls: 0,
+      scraped_pages: 0,
+      extracted_products: 0,
+    });
+
     console.log("Step 1: Mapping product URLs for", formattedUrl);
 
     // Step 1: Map - discover product URLs
@@ -84,32 +115,45 @@ Deno.serve(async (req) => {
       }),
     });
 
+    if (!mapRes.ok) {
+      const errText = await mapRes.text();
+      console.error("Map failed:", errText.substring(0, 200));
+      await updateProgress({ status: "error", error_message: "Failed to discover product pages" });
+      return new Response(
+        JSON.stringify({ error: "Failed to discover product pages" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const mapData = await mapRes.json();
-    if (!mapRes.ok || !mapData.success) {
+    if (!mapData.success) {
       console.error("Map failed:", mapData);
+      await updateProgress({ status: "error", error_message: mapData.error || "Map failed" });
       return new Response(
         JSON.stringify({ error: "Failed to discover product pages", details: mapData.error }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Use all discovered URLs (up to 200) - let AI decide what's a product
     const allLinks: string[] = mapData.links || [];
     const productUrls = allLinks.slice(0, 200);
     console.log(`Found ${allLinks.length} URLs, scraping ${productUrls.length} pages`);
 
+    await updateProgress({ status: "scraping", total_urls: productUrls.length });
+
     if (productUrls.length === 0) {
+      await updateProgress({ status: "done", total_urls: 0 });
       return new Response(
-        JSON.stringify({ success: true, products_found: 0, categories: [], pages_scanned: 0 }),
+        JSON.stringify({ success: true, products_found: 0, categories: [], pages_scanned: 0, runId }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Step 2: Scrape product pages in batches to avoid rate limits
+    // Step 2: Scrape product pages in batches
     console.log("Step 2: Scraping product pages in batches...");
-    
+
     const scrapedPages: { url: string; markdown: string }[] = [];
-    const concurrency = 10; // scrape 10 at a time
+    const concurrency = 10;
 
     for (let i = 0; i < productUrls.length; i += concurrency) {
       const batch = productUrls.slice(i, i + concurrency);
@@ -153,23 +197,26 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Update progress after each batch
+      await updateProgress({ scraped_pages: scrapedPages.length });
       console.log(`Batch ${Math.floor(i / concurrency) + 1}: scraped ${scrapedPages.length} pages so far`);
     }
 
     console.log(`Scraped ${scrapedPages.length} pages successfully`);
 
     if (scrapedPages.length === 0) {
+      await updateProgress({ status: "done", scraped_pages: 0 });
       return new Response(
-        JSON.stringify({ success: true, products_found: 0, categories: [], pages_scanned: productUrls.length }),
+        JSON.stringify({ success: true, products_found: 0, categories: [], pages_scanned: productUrls.length, runId }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Step 3: Extract structured product data using AI
+    await updateProgress({ status: "extracting" });
     console.log("Step 3: Extracting product data with AI...");
     const allProducts: any[] = [];
 
-    // Process in batches of 5 pages per AI call
     const batchSize = 5;
     for (let i = 0; i < scrapedPages.length; i += batchSize) {
       const batch = scrapedPages.slice(i, i + batchSize);
@@ -257,7 +304,7 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
 
         if (!aiRes.ok) {
           const errText = await aiRes.text();
-          console.error(`AI extraction failed (${aiRes.status}):`, errText);
+          console.error(`AI extraction failed (${aiRes.status}):`, errText.substring(0, 200));
           continue;
         }
 
@@ -267,6 +314,7 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
           const parsed = JSON.parse(toolCall.function.arguments);
           if (Array.isArray(parsed.products)) {
             allProducts.push(...parsed.products);
+            await updateProgress({ extracted_products: allProducts.length });
           }
         }
       } catch (e) {
@@ -277,18 +325,12 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
     console.log(`Extracted ${allProducts.length} products`);
 
     // Step 4: Persist to database
+    await updateProgress({ status: "saving" });
     console.log("Step 4: Persisting products...");
-
-    // Use service role for DB operations
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     // Delete existing products for this user
     await adminClient.from("products").delete().eq("user_id", userId);
 
-    // Bulk insert
     if (allProducts.length > 0) {
       const rows = allProducts.map((p) => ({
         user_id: userId,
@@ -308,6 +350,7 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
       const { error: insertError } = await adminClient.from("products").insert(rows);
       if (insertError) {
         console.error("Insert error:", insertError);
+        await updateProgress({ status: "error", error_message: insertError.message });
         return new Response(
           JSON.stringify({ error: "Failed to save products", details: insertError.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -317,6 +360,7 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
 
     const categories = [...new Set(allProducts.map((p) => p.category).filter(Boolean))];
 
+    await updateProgress({ status: "done", extracted_products: allProducts.length });
     console.log("Done! Products:", allProducts.length, "Categories:", categories.length);
 
     return new Response(
@@ -325,11 +369,15 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
         products_found: allProducts.length,
         categories,
         pages_scanned: scrapedPages.length,
+        runId,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("scrape-products error:", e);
+    if (runId && userId) {
+      await updateProgress({ status: "error", error_message: e instanceof Error ? e.message : "Unknown error" });
+    }
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

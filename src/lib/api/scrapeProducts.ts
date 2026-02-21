@@ -5,10 +5,19 @@ export interface ScrapeResult {
   products_found: number;
   categories: string[];
   pages_scanned: number;
+  runId?: string;
   error?: string;
 }
 
-export async function scrapeProducts(url: string): Promise<ScrapeResult> {
+export interface ScrapeProgress {
+  status: string;
+  total_urls: number;
+  scraped_pages: number;
+  extracted_products: number;
+  error_message: string | null;
+}
+
+export async function scrapeProducts(url: string, runId: string): Promise<ScrapeResult> {
   // Ensure we have a valid session before the long-running scrape
   const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
   
@@ -23,7 +32,7 @@ export async function scrapeProducts(url: string): Promise<ScrapeResult> {
   }
 
   const { data, error } = await supabase.functions.invoke("scrape-products", {
-    body: { url },
+    body: { url, runId },
   });
 
   if (error) {
@@ -35,4 +44,15 @@ export async function scrapeProducts(url: string): Promise<ScrapeResult> {
   }
 
   return data as ScrapeResult;
+}
+
+export async function pollScrapeProgress(runId: string): Promise<ScrapeProgress | null> {
+  const { data, error } = await supabase
+    .from("scrape_progress")
+    .select("status, total_urls, scraped_pages, extracted_products, error_message")
+    .eq("run_id", runId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as ScrapeProgress;
 }

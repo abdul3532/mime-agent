@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Search, CheckCircle2, FileText, Tag, AlertTriangle, XCircle, LogIn } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { scrapeProducts, ScrapeResult } from "@/lib/api/scrapeProducts";
+import { scrapeProducts, pollScrapeProgress, ScrapeResult, ScrapeProgress } from "@/lib/api/scrapeProducts";
 import { useAuth } from "@/context/AuthContext";
 
 interface Props {
@@ -13,9 +13,9 @@ interface Props {
 
 const stages = [
   "Discover product pages",
-  "Extract product facts",
-  "Normalize categories/tags",
-  "Compile agent storefront",
+  "Scrape product content",
+  "Extract with AI",
+  "Save to dashboard",
 ];
 
 export function StepCrawl({ storeUrl, onComplete }: Props) {
@@ -26,28 +26,48 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [result, setResult] = useState<ScrapeResult | null>(null);
+  const [progress, setProgress] = useState<ScrapeProgress | null>(null);
+  const runIdRef = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
     if (authLoading) return;
 
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
     async function run() {
       setStage(0);
       setError(null);
       setNeedsAuth(false);
+      setProgress(null);
 
-      const stageTimer = setInterval(() => {
-        setStage((prev) => (prev < 2 ? prev + 1 : prev));
-      }, 5000);
+      const runId = runIdRef.current;
+
+      // Start polling for progress
+      pollTimer = setInterval(async () => {
+        if (cancelled) return;
+        const p = await pollScrapeProgress(runId);
+        if (!p || cancelled) return;
+        setProgress(p);
+
+        // Map status to stage
+        if (p.status === "mapping") setStage(0);
+        else if (p.status === "scraping") setStage(1);
+        else if (p.status === "extracting") setStage(2);
+        else if (p.status === "saving") setStage(3);
+        else if (p.status === "error") {
+          setError(p.error_message || "Scraping failed");
+          if (pollTimer) clearInterval(pollTimer);
+        }
+      }, 2000);
 
       try {
-        const res = await scrapeProducts(storeUrl);
-        clearInterval(stageTimer);
+        const res = await scrapeProducts(storeUrl, runId);
+        if (pollTimer) clearInterval(pollTimer);
         if (cancelled) return;
 
         if (!res.success) {
-          if (res.error?.includes("Session expired") || res.error?.includes("sign in")) {
+          if (res.error?.includes("Session expired") || res.error?.includes("sign in") || res.error?.includes("Unauthorized")) {
             setNeedsAuth(true);
           } else {
             setError(res.error || "Scraping failed");
@@ -58,18 +78,36 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         setStage(3);
         setResult(res);
 
+        // Final progress fetch
+        const finalProgress = await pollScrapeProgress(runId);
+        if (finalProgress) setProgress(finalProgress);
+
         setTimeout(() => {
           if (!cancelled) setDone(true);
         }, 800);
       } catch (e) {
-        clearInterval(stageTimer);
+        if (pollTimer) clearInterval(pollTimer);
         if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
       }
     }
 
     run();
-    return () => { cancelled = true; };
-  }, [storeUrl, user, authLoading]);
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [storeUrl, authLoading]);
+
+  const progressLabel = (() => {
+    if (!progress) return "Starting scan...";
+    const { status, total_urls, scraped_pages, extracted_products } = progress;
+    if (status === "mapping") return "Discovering product pages...";
+    if (status === "scraping") return `Scraped ${scraped_pages}/${total_urls} pages...`;
+    if (status === "extracting") return `Extracting products with AI... (${extracted_products} found so far)`;
+    if (status === "saving") return `Saving ${extracted_products} products...`;
+    if (status === "done") return `Done! ${extracted_products} products saved.`;
+    return "Processing...";
+  })();
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -84,9 +122,16 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       </div>
 
       {/* Progress bar */}
-      {!done && !error && (
-        <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-          <div className="progress-fill h-full rounded-full animate-pulse" style={{ width: `${((stage + 1) / stages.length) * 100}%`, transition: "width 1s ease" }} />
+      {!done && !error && !needsAuth && (
+        <div className="space-y-2">
+          <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+            <div className="progress-fill h-full rounded-full transition-all duration-700 ease-out" style={{
+              width: progress?.total_urls
+                ? `${Math.max(((stage + 1) / stages.length) * 100, (progress.scraped_pages / progress.total_urls) * 100)}%`
+                : `${((stage + 1) / stages.length) * 100}%`,
+            }} />
+          </div>
+          <p className="text-xs text-muted-foreground font-medium">{progressLabel}</p>
         </div>
       )}
 
@@ -96,12 +141,16 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
           <div key={s} className="flex items-center gap-3 text-sm">
             <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
               i < stage || done ? "bg-accent text-accent-foreground" :
-              i === stage && !done && !error ? "bg-primary text-primary-foreground animate-pulse" :
+              i === stage && !done && !error && !needsAuth ? "bg-primary text-primary-foreground animate-pulse" :
               "bg-muted text-muted-foreground"
             }`}>
               {i < stage || done ? "✓" : i + 1}
             </div>
-            <span className={i <= stage || done ? "text-foreground" : "text-muted-foreground"}>{s}</span>
+            <span className={i <= stage || done ? "text-foreground" : "text-muted-foreground"}>
+              {s}
+              {i === 1 && stage === 1 && progress?.total_urls ? ` (${progress.scraped_pages}/${progress.total_urls})` : ""}
+              {i === 2 && stage === 2 && progress?.extracted_products ? ` (${progress.extracted_products} products)` : ""}
+            </span>
           </div>
         ))}
       </div>
@@ -177,8 +226,8 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       )}
 
       {/* Loading indicator */}
-      {!done && !error && !needsAuth && (
-        <p className="text-xs text-muted-foreground animate-pulse">This may take 30–60 seconds depending on the site size...</p>
+      {!done && !error && !needsAuth && !progress && (
+        <p className="text-xs text-muted-foreground animate-pulse">Connecting to scraping service...</p>
       )}
     </motion.div>
   );
