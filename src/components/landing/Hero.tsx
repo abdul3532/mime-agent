@@ -57,6 +57,8 @@ export function Hero() {
 
   return (
     <section ref={ref} id="hero" className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
+      {/* Bottom fade to blend into next section */}
+      <div className="absolute bottom-0 left-0 right-0 h-40 z-10 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--background)))" }} />
       <StarField />
 
       {/* Parallax grid */}
