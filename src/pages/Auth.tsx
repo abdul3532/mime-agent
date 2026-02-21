@@ -19,6 +19,10 @@ export default function Auth() {
   const navigate = useNavigate();
   const { theme } = useTheme();
 
+  // If user was in the wizard, redirect back there after sign-in
+  const wizardStep = localStorage.getItem("mime_wizard_step");
+  const redirectTo = wizardStep && parseInt(wizardStep) > 0 ? "/#wizard" : "/dashboard";
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -31,14 +35,14 @@ export default function Auth() {
         });
         if (error) throw error;
         if (data.session) {
-          navigate("/dashboard");
+          navigate(redirectTo);
         } else {
           toast({ title: "Check your email", description: "We sent you a confirmation link." });
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate("/dashboard");
+        navigate(redirectTo);
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
