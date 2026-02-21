@@ -22,11 +22,13 @@ export function Hero() {
     document.querySelector(id)?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <section ref={ref} id="hero" className="relative overflow-hidden pt-28 pb-20 md:pt-40 md:pb-32">
-      {/* Animated background */}
-      <div className="absolute inset-0 grid-pattern opacity-50" />
-      <div className="orb w-[600px] h-[600px] bg-accent/8 top-[-200px] right-[-100px]" />
-      <div className="orb w-[400px] h-[400px] bg-primary/6 bottom-[-100px] left-[-100px]" style={{ animationDelay: "-7s" }} />
+    <section ref={ref} id="hero" className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
+      {/* Ambient background effects */}
+      <div className="absolute inset-0 grid-pattern opacity-30" />
+      <div className="orb w-[700px] h-[700px] bg-primary/8 top-[-300px] right-[-200px]" />
+      <div className="orb w-[500px] h-[500px] bg-accent/5 bottom-[-200px] left-[-150px]" style={{ animationDelay: "-7s" }} />
+      {/* Top arc glow like NEONE reference */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] rounded-[50%] pointer-events-none" style={{ background: "radial-gradient(ellipse at center top, hsl(230 70% 58% / 0.12) 0%, transparent 60%)" }} />
 
       <motion.div style={{ y, opacity, scale }} className="container mx-auto px-4 relative">
         <motion.div
@@ -39,9 +41,9 @@ export function Hero() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/15 text-accent-foreground text-sm font-medium mb-8 border border-accent/20"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8 border border-primary/20"
           >
-            <span className="w-2 h-2 rounded-full bg-accent pulse-dot" />
+            <span className="w-2 h-2 rounded-full bg-primary pulse-dot" />
             Building the commerce layer for the agentic economy
           </motion.div>
 
@@ -53,12 +55,12 @@ export function Hero() {
           >
             MIME makes your store{" "}
             <span className="relative inline-block">
-              <span className="text-primary">readable for AI agents</span>
+              <span className="bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent">readable for AI agents</span>
               <motion.span
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ duration: 0.8, delay: 1 }}
-                className="absolute -bottom-1 left-0 right-0 h-1 bg-accent/40 rounded-full origin-left"
+                className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-primary/60 to-accent/40 rounded-full origin-left"
               />
             </span>
             .
@@ -83,7 +85,7 @@ export function Hero() {
               Start demo
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => scrollTo("#wizard")} className="group">
+            <Button size="lg" variant="outline" onClick={() => scrollTo("#wizard")} className="group border-border/60 hover:border-primary/40 hover:bg-primary/5">
               View dashboard
             </Button>
           </motion.div>
@@ -100,7 +102,7 @@ export function Hero() {
               whileHover={{ y: -6, transition: { duration: 0.2 } }}
               className="card-elevated p-5 text-center group"
             >
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:bg-primary group-hover:shadow-lg group-hover:scale-110">
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:bg-primary group-hover:shadow-lg group-hover:scale-110" style={{ boxShadow: "none" }}>
                 <b.icon className="h-5 w-5 text-primary transition-colors duration-300 group-hover:text-primary-foreground" />
               </div>
               <h3 className="text-sm font-semibold mb-1">{b.title}</h3>

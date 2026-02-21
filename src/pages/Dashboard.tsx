@@ -40,13 +40,13 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col hero-gradient text-primary-foreground">
-        <div className="p-5 border-b border-primary-foreground/10">
-          <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs opacity-60 hover:opacity-100 transition-all duration-200 mb-4 hover:translate-x-[-2px]">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-card border-r border-border/50">
+        <div className="p-5 border-b border-border/50">
+          <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-all duration-200 mb-4 hover:translate-x-[-2px]">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to home
           </button>
-          <img src={mimeLogo} alt="MIME" className="h-7 brightness-0 invert" />
-          <p className="text-xs opacity-50 mt-1">Storefront Manager</p>
+          <img src={mimeLogo} alt="MIME" className="h-14 -my-3" />
+          <p className="text-xs text-muted-foreground mt-1">Storefront Manager</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {tabs.map((t) => (
@@ -55,14 +55,14 @@ const Dashboard = () => {
               onClick={() => setActiveTab(t.id)}
               className={`nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium relative ${
                 activeTab === t.id
-                  ? "bg-primary-foreground/15 text-primary-foreground"
-                  : "text-primary-foreground/50 hover:text-primary-foreground/90 hover:bg-primary-foreground/5"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
             >
               {activeTab === t.id && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-accent"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-primary"
                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 />
               )}
@@ -71,15 +71,15 @@ const Dashboard = () => {
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t border-primary-foreground/10">
-          <div className="text-xs opacity-40">v1.0 beta</div>
+        <div className="p-4 border-t border-border/50">
+          <div className="text-xs text-muted-foreground/50">v1.0 beta</div>
         </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-14 border-b bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 shrink-0">
+        <header className="h-14 border-b border-border/50 bg-background/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-3">
             <select
               className="md:hidden bg-transparent text-sm font-medium border rounded px-2 py-1"
