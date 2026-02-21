@@ -76,7 +76,7 @@ export function WizardContainer() {
         </motion.div>
 
         {/* Progress bar */}
-        <div className="max-w-3xl mx-auto mb-10">
+        <div className="max-w-5xl mx-auto mb-12">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Progress</span>
             <span className="text-sm font-semibold text-primary">{Math.round(progress)}%</span>
@@ -105,10 +105,10 @@ export function WizardContainer() {
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto flex flex-col lg:flex-row gap-8">
+        <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-10">
           {/* Step list sidebar */}
-          <div className="lg:w-56 shrink-0">
-            <div className="lg:sticky lg:top-24 space-y-2">
+          <div className="lg:w-64 shrink-0">
+            <div className="lg:sticky lg:top-24 space-y-3">
               {stepLabels.map((label, i) => {
                 const status = getStatus(i);
                 return (
@@ -120,7 +120,7 @@ export function WizardContainer() {
                       x: status === "active" ? 4 : 0,
                     }}
                     transition={{ duration: 0.3 }}
-                    className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors w-full text-left ${
+                    className={`flex items-center gap-3 p-3.5 rounded-xl text-sm font-medium transition-colors w-full text-left ${
                       status === "active" ? "bg-primary/10 text-primary" :
                       status === "completed" ? "text-accent-foreground hover:bg-accent/10 cursor-pointer" : "text-muted-foreground cursor-default"
                     }`}
@@ -145,12 +145,12 @@ export function WizardContainer() {
           </div>
 
           {/* Active step content */}
-          <div className="flex-1 space-y-4">
+          <div className="flex-1 space-y-5">
             <AnimatePresence mode="wait">
               {/* Step 1 */}
               <div ref={(el) => (stepRefs.current[0] = el)}>
                 {currentStep === 0 && (
-                  <motion.div key="step1" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="card-elevated p-6 step-active">
+                  <motion.div key="step1" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="card-elevated p-8 step-active">
                     <StepUrl onComplete={(url) => { setStoreUrl(url); advanceStep(); }} />
                   </motion.div>
                 )}
@@ -169,7 +169,7 @@ export function WizardContainer() {
               {/* Step 2 */}
               <div ref={(el) => (stepRefs.current[1] = el)}>
                 {currentStep === 1 && (
-                  <motion.div key="step2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-6 step-active">
+                  <motion.div key="step2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
                     <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
                       <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
@@ -198,7 +198,7 @@ export function WizardContainer() {
               {/* Step 3 */}
               <div ref={(el) => (stepRefs.current[2] = el)}>
                 {currentStep === 2 && (
-                  <motion.div key="step3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-6 step-active">
+                  <motion.div key="step3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
                     <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
                       <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
@@ -227,7 +227,7 @@ export function WizardContainer() {
               {/* Step 4 */}
               <div ref={(el) => (stepRefs.current[3] = el)}>
                 {currentStep === 3 && (
-                  <motion.div key="step4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-6 step-active">
+                  <motion.div key="step4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
                     <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
                       <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
