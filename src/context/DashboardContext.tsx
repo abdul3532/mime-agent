@@ -27,6 +27,8 @@ interface DashboardContextType {
   loading: boolean;
   rescanning: boolean;
   setRescanning: (v: boolean) => void;
+  scanStep: string;
+  setScanStep: (s: string) => void;
   lastScannedAt: Date | null;
   setLastScannedAt: (d: Date | null) => void;
   saveProducts: () => Promise<void>;
@@ -45,6 +47,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [rescanning, setRescanning] = useState(false);
+  const [scanStep, setScanStep] = useState("");
   const [lastScannedAt, setLastScannedAt] = useState<Date | null>(null);
 
   // Load products from DB
@@ -169,6 +172,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       appliedSuggestions, applySuggestion,
       activeTab, setActiveTab,
       loading, rescanning, setRescanning,
+      scanStep, setScanStep,
       lastScannedAt, setLastScannedAt,
       saveProducts, saveRules, reloadProducts,
     }}>
