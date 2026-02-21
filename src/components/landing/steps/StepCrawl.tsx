@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Search, CheckCircle2, FileText, Tag, AlertTriangle, XCircle } from "lucide-react";
+import { Search, CheckCircle2, FileText, Tag, AlertTriangle, XCircle, LogIn } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { scrapeProducts, ScrapeResult } from "@/lib/api/scrapeProducts";
+import { useAuth } from "@/context/AuthContext";
 
 interface Props {
   storeUrl: string;
@@ -19,19 +20,27 @@ const stages = [
 
 export function StepCrawl({ storeUrl, onComplete }: Props) {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [stage, setStage] = useState(0);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsAuth, setNeedsAuth] = useState(false);
   const [result, setResult] = useState<ScrapeResult | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setNeedsAuth(true);
+      return;
+    }
+
     let cancelled = false;
 
     async function run() {
       setStage(0);
       setError(null);
+      setNeedsAuth(false);
 
-      // Simulate stage progression while the API call runs
       const stageTimer = setInterval(() => {
         setStage((prev) => (prev < 2 ? prev + 1 : prev));
       }, 5000);
@@ -42,14 +51,17 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         if (cancelled) return;
 
         if (!res.success) {
-          setError(res.error || "Scraping failed");
+          if (res.error?.includes("Session expired") || res.error?.includes("sign in")) {
+            setNeedsAuth(true);
+          } else {
+            setError(res.error || "Scraping failed");
+          }
           return;
         }
 
         setStage(3);
         setResult(res);
 
-        // Brief pause to show final stage
         setTimeout(() => {
           if (!cancelled) setDone(true);
         }, 800);
@@ -61,7 +73,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
 
     run();
     return () => { cancelled = true; };
-  }, [storeUrl]);
+  }, [storeUrl, user, authLoading]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -98,8 +110,22 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         ))}
       </div>
 
+      {/* Needs auth state */}
+      {needsAuth && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+          <div className="flex items-center gap-2 text-primary font-semibold">
+            <LogIn className="h-5 w-5" />
+            Sign in required
+          </div>
+          <p className="text-sm text-muted-foreground">You need to sign in before we can scan your store and save your products.</p>
+          <Button onClick={() => navigate("/auth")} className="gap-2">
+            <LogIn className="h-4 w-4" /> Sign in to continue
+          </Button>
+        </motion.div>
+      )}
+
       {/* Error state */}
-      {error && (
+      {error && !needsAuth && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           <div className="flex items-center gap-2 text-destructive font-semibold">
             <XCircle className="h-5 w-5" />
@@ -155,7 +181,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       )}
 
       {/* Loading indicator */}
-      {!done && !error && (
+      {!done && !error && !needsAuth && (
         <p className="text-xs text-muted-foreground animate-pulse">This may take 30–60 seconds depending on the site size...</p>
       )}
     </motion.div>
