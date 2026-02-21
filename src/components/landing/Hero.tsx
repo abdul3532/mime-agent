@@ -1,5 +1,5 @@
 import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Zap, ShieldCheck, SlidersHorizontal, Globe, CheckCircle2, ArrowRight } from "lucide-react";
 import { StarField } from "./StarField";
@@ -12,31 +12,63 @@ const benefits = [
   { icon: CheckCircle2, title: "Verifiable", desc: "Installation check + live status" },
 ];
 
+const subtitleText = "One installation. One structured storefront. Reliable discovery for agentic commerce.";
+
+function TypingText({ text, delay = 0.8 }: { text: string; delay?: number }) {
+  const [displayed, setDisplayed] = useState("");
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setStarted(true), delay * 1000);
+    return () => clearTimeout(timer);
+  }, [delay]);
+
+  useEffect(() => {
+    if (!started) return;
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) clearInterval(interval);
+    }, 30);
+    return () => clearInterval(interval);
+  }, [started, text]);
+
+  return (
+    <span>
+      {displayed}
+      {started && displayed.length < text.length && (
+        <span className="inline-block w-[2px] h-[1em] bg-foreground/60 ml-0.5 animate-pulse align-middle" />
+      )}
+    </span>
+  );
+}
+
 export function Hero() {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], [0, 150]);
   const opacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
   const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
+  const gridY = useTransform(scrollYProgress, [0, 1], [0, 60]);
 
   const scrollTo = (id: string) =>
     document.querySelector(id)?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <section ref={ref} id="hero" className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
-      {/* Star field */}
       <StarField />
 
-      {/* Ambient background effects */}
-      <div className="absolute inset-0 grid-pattern opacity-20" />
-      <div className="orb w-[700px] h-[700px] bg-primary/8 top-[-300px] right-[-200px]" />
-      <div className="orb w-[500px] h-[500px] bg-accent/5 bottom-[-200px] left-[-150px]" style={{ animationDelay: "-7s" }} />
-      {/* Purple orb for depth */}
-      <div className="orb w-[600px] h-[600px] top-[-100px] left-[20%]" style={{ background: "hsl(270 60% 55% / 0.06)", animationDelay: "-12s" }} />
-      <div className="orb w-[400px] h-[400px] bottom-[10%] right-[10%]" style={{ background: "hsl(270 60% 55% / 0.04)", animationDelay: "-4s" }} />
+      {/* Parallax grid */}
+      <motion.div style={{ y: gridY }} className="absolute inset-0 grid-pattern opacity-20" />
 
-      {/* Top arc glow — blue + purple blend */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] rounded-[50%] pointer-events-none" style={{ background: "radial-gradient(ellipse at center top, hsl(230 70% 58% / 0.12) 0%, hsl(270 60% 55% / 0.06) 40%, transparent 70%)" }} />
+      {/* Ambient orbs — monochrome */}
+      <div className="orb w-[700px] h-[700px] bg-foreground/[0.03] top-[-300px] right-[-200px]" />
+      <div className="orb w-[500px] h-[500px] bg-foreground/[0.02] bottom-[-200px] left-[-150px]" style={{ animationDelay: "-7s" }} />
+      <div className="orb w-[600px] h-[600px] bg-foreground/[0.02] top-[-100px] left-[20%]" style={{ animationDelay: "-12s" }} />
+
+      {/* Top arc glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] rounded-[50%] pointer-events-none" style={{ background: "radial-gradient(ellipse at center top, hsl(0 0% 100% / 0.04) 0%, hsl(0 0% 100% / 0.02) 40%, transparent 70%)" }} />
 
       <motion.div style={{ y, opacity, scale }} className="container mx-auto px-4 relative">
         <motion.div
@@ -49,9 +81,9 @@ export function Hero() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8 border border-primary/20 backdrop-blur-sm"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-foreground/5 text-foreground/70 text-sm font-medium mb-8 border border-foreground/10 backdrop-blur-sm"
           >
-            <span className="w-2 h-2 rounded-full bg-primary pulse-dot" />
+            <span className="w-2 h-2 rounded-full bg-foreground/60 pulse-dot" />
             Building the commerce layer for the agentic economy
           </motion.div>
 
@@ -63,24 +95,24 @@ export function Hero() {
           >
             MIME makes your store{" "}
             <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-primary via-[hsl(270,60%,65%)] to-accent bg-clip-text text-transparent">readable for AI agents</span>
+              <span className="text-foreground">readable for AI agents</span>
               <motion.span
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ duration: 0.8, delay: 1 }}
-                className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-primary/60 via-[hsl(270,60%,55%,0.4)] to-accent/40 rounded-full origin-left"
+                className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-foreground/60 via-foreground/30 to-foreground/10 rounded-full origin-left"
               />
             </span>
             .
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.5 }}
+            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 min-h-[2em]"
           >
-            One installation. One structured storefront. Reliable discovery for agentic commerce.
+            <TypingText text={subtitleText} delay={1.2} />
           </motion.p>
 
           <motion.div
@@ -93,7 +125,7 @@ export function Hero() {
               Start demo
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => scrollTo("#wizard")} className="group border-border/60 hover:border-primary/40 hover:bg-primary/5">
+            <Button size="lg" variant="outline" onClick={() => scrollTo("#wizard")} className="group border-border hover:border-foreground/30 hover:bg-foreground/5">
               View dashboard
             </Button>
           </motion.div>
@@ -110,8 +142,8 @@ export function Hero() {
               whileHover={{ y: -6, transition: { duration: 0.2 } }}
               className="card-glass p-5 text-center group"
             >
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:bg-primary group-hover:scale-110" style={{ boxShadow: "none" }}>
-                <b.icon className="h-5 w-5 text-primary transition-colors duration-300 group-hover:text-primary-foreground" />
+              <div className="w-11 h-11 rounded-xl bg-foreground/5 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:bg-foreground group-hover:scale-110">
+                <b.icon className="h-5 w-5 text-foreground/70 transition-colors duration-300 group-hover:text-background" />
               </div>
               <h3 className="text-sm font-semibold mb-1">{b.title}</h3>
               <p className="text-xs text-muted-foreground">{b.desc}</p>
