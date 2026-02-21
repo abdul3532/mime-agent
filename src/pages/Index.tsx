@@ -15,8 +15,8 @@ const Index = () => {
       <Navbar />
       <main>
         <Hero />
-        <HowItWorks />
         <div ref={mimeTrackRef}>
+          <HowItWorks />
           <PeekingMime trackRef={mimeTrackRef} />
           <Comparison />
           <WizardContainer />

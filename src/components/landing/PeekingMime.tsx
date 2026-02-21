@@ -19,9 +19,9 @@ export function PeekingMime({ trackRef }: { trackRef: React.RefObject<HTMLDivEle
     offset: ["start end", "end start"],
   });
 
-  const x = useTransform(scrollYProgress, [0.05, 0.2, 0.8, 0.95], [-160, 0, 0, -160]);
-  const opacity = useTransform(scrollYProgress, [0.05, 0.2, 0.8, 0.95], [0, 1, 1, 0]);
-  const rotate = useTransform(scrollYProgress, [0.05, 0.25], [-10, 5]);
+  const x = useTransform(scrollYProgress, [0.0, 0.05, 0.15, 0.22], [-160, 0, 0, -160]);
+  const opacity = useTransform(scrollYProgress, [0.0, 0.05, 0.15, 0.22], [0, 1, 1, 0]);
+  const rotate = useTransform(scrollYProgress, [0.0, 0.1], [-10, 5]);
 
   const springX = useSpring(x, { stiffness: 80, damping: 20 });
   const springRotate = useSpring(rotate, { stiffness: 80, damping: 20 });
