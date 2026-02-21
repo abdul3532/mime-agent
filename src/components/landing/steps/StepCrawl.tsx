@@ -87,7 +87,27 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         }, 800);
       } catch (e) {
         if (pollTimer) clearInterval(pollTimer);
-        if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
+        if (cancelled) return;
+        
+        // Edge function may have timed out — check if products were saved incrementally
+        const finalProgress = await pollScrapeProgress(runId);
+        if (finalProgress && finalProgress.extracted_products > 0) {
+          // Partial success: products were saved before timeout
+          setStage(3);
+          setProgress({ ...finalProgress, status: "done" });
+          setResult({
+            success: true,
+            products_found: finalProgress.extracted_products,
+            categories: [],
+            pages_scanned: finalProgress.scraped_pages,
+            runId,
+          });
+          setTimeout(() => {
+            if (!cancelled) setDone(true);
+          }, 800);
+        } else {
+          setError(e instanceof Error ? e.message : "Unknown error");
+        }
       }
     }
 
