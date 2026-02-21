@@ -14,7 +14,7 @@ import { ProductDetailDialog } from "./ProductDetailDialog";
 const PAGE_SIZE = 10;
 
 export function ProductsSection() {
-  const { products, setProducts, updateProduct, rescanning, scanStep } = useDashboard();
+  const { products, setProducts, updateProduct, rescanning, scanStep, seedDemoProducts, seeding } = useDashboard();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [availFilter, setAvailFilter] = useState<string>("all");
@@ -108,6 +108,24 @@ export function ProductsSection() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (products.length === 0 && !rescanning) {
+    return (
+      <div className="space-y-4">
+        <h2 className="font-heading text-2xl font-bold">Products</h2>
+        <div className="rounded-xl border border-border/50 bg-card p-12 text-center">
+          <Package className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No products yet</h3>
+          <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+            Scan your store or load demo data to see products here.
+          </p>
+          <Button onClick={seedDemoProducts} disabled={seeding}>
+            {seeding ? "Loading..." : "Load demo data"}
+          </Button>
         </div>
       </div>
     );
