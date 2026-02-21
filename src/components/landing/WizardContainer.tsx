@@ -12,7 +12,7 @@ type StepStatus = "locked" | "active" | "completed";
 const stepLabels = [
   "Connect your store",
   "Set priorities",
-  "Scan & compile",
+  "Scan & complete",
   "Install & verify",
 ];
 
@@ -209,7 +209,7 @@ export function WizardContainer() {
                   <div onClick={() => { setCurrentStep(2); scrollToStep(2); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-accent" />
-                      <span className="font-medium">Scan complete — 58 products indexed</span>
+                      <span className="font-medium">Scan complete — products indexed</span>
                       <ChevronLeft className="h-3 w-3 text-muted-foreground ml-auto" />
                     </div>
                   </div>
@@ -218,7 +218,7 @@ export function WizardContainer() {
                   <div className="card-elevated p-6 step-locked">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Lock className="h-4 w-4" />
-                      <span>Scan & compile — complete previous steps</span>
+                      <span>Scan & complete — complete previous steps</span>
                     </div>
                   </div>
                 )}
