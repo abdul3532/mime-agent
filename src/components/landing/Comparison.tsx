@@ -1,7 +1,6 @@
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { XCircle, CheckCircle2, AlertTriangle, Clock, Zap, ShieldCheck, SlidersHorizontal, Bot } from "lucide-react";
-import { ScrollMimeAnimation } from "./ScrollMimeAnimation";
 
 const beforeItems = [
   { icon: Bot, label: "Agent crawls entire site", detail: "500+ pages, 12+ seconds", status: "bad" as const },
@@ -238,13 +237,10 @@ export function Comparison() {
         </div>
 
         {/* Stats row with count-up */}
-        <div className="max-w-4xl mx-auto mt-12 flex items-center gap-6">
-          <ScrollMimeAnimation trackRef={sectionRef as React.RefObject<HTMLElement>} />
-          <div className="grid grid-cols-3 gap-4 flex-1">
-            {stats.map((s, i) => (
-              <CountUpStat key={s.label} target={s.target} suffix={s.suffix} label={s.label} delay={i * 200} />
-            ))}
-          </div>
+        <div className="max-w-3xl mx-auto mt-12 grid grid-cols-3 gap-4">
+          {stats.map((s, i) => (
+            <CountUpStat key={s.label} target={s.target} suffix={s.suffix} label={s.label} delay={i * 200} />
+          ))}
         </div>
       </div>
     </section>
