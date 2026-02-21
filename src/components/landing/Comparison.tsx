@@ -1,4 +1,4 @@
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { XCircle, CheckCircle2, AlertTriangle, Clock, Zap, ShieldCheck, SlidersHorizontal, Bot } from "lucide-react";
 
@@ -53,7 +53,7 @@ function CountUpStat({ target, suffix, label, delay }: { target: number; suffix:
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
       className="text-center p-5 rounded-xl card-elevated group"
     >
-      <div className="text-2xl md:text-4xl font-heading font-extrabold bg-gradient-to-r from-primary via-[hsl(270,60%,65%)] to-accent bg-clip-text text-transparent transition-all duration-300 group-hover:drop-shadow-[0_0_12px_hsl(var(--glow-purple)/0.4)]">
+      <div className="text-2xl md:text-4xl font-heading font-extrabold text-foreground transition-all duration-300 group-hover:drop-shadow-[0_0_12px_hsl(0_0%_100%/0.2)]">
         {count}{suffix}
       </div>
       <div className="text-xs text-muted-foreground mt-1.5">{label}</div>
@@ -62,11 +62,15 @@ function CountUpStat({ target, suffix, label, delay }: { target: number; suffix:
 }
 
 export function Comparison() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
+  const gridY = useTransform(scrollYProgress, [0, 1], [-20, 40]);
+
   return (
-    <section className="py-20 md:py-28 relative overflow-hidden">
-      <div className="absolute inset-0 grid-pattern opacity-10" />
-      {/* Purple ambient glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] rounded-full pointer-events-none" style={{ background: "radial-gradient(ellipse, hsl(270 60% 55% / 0.06) 0%, transparent 70%)" }} />
+    <section ref={sectionRef} className="py-20 md:py-28 relative overflow-hidden">
+      <motion.div style={{ y: gridY }} className="absolute inset-0 grid-pattern opacity-10" />
+      {/* Ambient glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] rounded-full pointer-events-none" style={{ background: "radial-gradient(ellipse, hsl(0 0% 100% / 0.03) 0%, transparent 70%)" }} />
 
       <div className="container mx-auto px-4 relative">
         <motion.div
@@ -81,7 +85,7 @@ export function Comparison() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-xs font-semibold tracking-widest uppercase text-primary mb-3 block"
+            className="text-xs font-semibold tracking-widest uppercase text-foreground/60 mb-3 block"
           >
             The difference
           </motion.span>
@@ -139,7 +143,7 @@ export function Comparison() {
                   viewport={{ once: true }}
                   transition={{ delay: 0.15 + i * 0.1, duration: 0.4 }}
                   whileHover={{ x: 4, transition: { duration: 0.15 } }}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-card border border-border/60 transition-all duration-200 hover:border-destructive/30 hover:shadow-[0_0_20px_-5px_hsl(0_72%_55%/0.15)]"
+                  className="flex items-start gap-3 p-3 rounded-xl bg-card border border-border/60 transition-all duration-200 hover:border-destructive/30 hover:shadow-[0_0_20px_-5px_hsl(0_60%_50%/0.1)]"
                 >
                   <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0 mt-0.5">
                     <item.icon className="h-4 w-4 text-destructive" />
@@ -152,13 +156,12 @@ export function Comparison() {
               ))}
             </div>
 
-            {/* Mock terminal with purple glow on hover */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.5 }}
-              className="rounded-lg bg-background border border-border/60 p-4 font-mono text-xs space-y-1 transition-all duration-300 hover:border-[hsl(270,60%,55%,0.3)] hover:shadow-[0_0_30px_-8px_hsl(270_60%_55%/0.2)]"
+              className="rounded-lg bg-background border border-border/60 p-4 font-mono text-xs space-y-1 transition-all duration-300 hover:border-foreground/20 hover:shadow-[0_0_30px_-8px_hsl(0_0%_100%/0.08)]"
             >
               <div className="text-muted-foreground">$ agent.discover("store.com")</div>
               <div className="text-destructive">⚠ Timeout: 12.4s — 523 pages crawled</div>
@@ -174,11 +177,10 @@ export function Comparison() {
             whileInView={{ opacity: 1, x: 0, rotateY: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, type: "spring", stiffness: 80 }}
-            className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-6 space-y-5 relative"
+            className="rounded-2xl border border-foreground/10 bg-foreground/[0.02] p-6 space-y-5 relative"
           >
-            {/* Purple + blue glow */}
-            <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-[80px] pointer-events-none" style={{ background: "hsl(270 60% 55% / 0.12)" }} />
-            <div className="absolute -bottom-16 -left-16 w-32 h-32 rounded-full bg-primary/8 blur-[60px] pointer-events-none" />
+            <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-[80px] pointer-events-none bg-foreground/[0.06]" />
+            <div className="absolute -bottom-16 -left-16 w-32 h-32 rounded-full bg-foreground/[0.04] blur-[60px] pointer-events-none" />
 
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -187,8 +189,8 @@ export function Comparison() {
               transition={{ delay: 0.2 }}
               className="flex items-center gap-3 relative"
             >
-              <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
+                <CheckCircle2 className="h-5 w-5 text-foreground/80" />
               </div>
               <div>
                 <h3 className="font-heading text-lg font-bold">With MIME</h3>
@@ -205,10 +207,10 @@ export function Comparison() {
                   viewport={{ once: true }}
                   transition={{ delay: 0.2 + i * 0.1, duration: 0.4 }}
                   whileHover={{ x: -4, transition: { duration: 0.15 } }}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-card border border-border/60 transition-all duration-200 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_hsl(270_60%_55%/0.2)]"
+                  className="flex items-start gap-3 p-3 rounded-xl bg-card border border-border/60 transition-all duration-200 hover:border-foreground/20 hover:shadow-[0_0_20px_-5px_hsl(0_0%_100%/0.08)]"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <item.icon className="h-4 w-4 text-primary" />
+                  <div className="w-8 h-8 rounded-lg bg-foreground/5 flex items-center justify-center shrink-0 mt-0.5">
+                    <item.icon className="h-4 w-4 text-foreground/70" />
                   </div>
                   <div>
                     <div className="text-sm font-semibold">{item.label}</div>
@@ -218,18 +220,17 @@ export function Comparison() {
               ))}
             </div>
 
-            {/* Mock terminal with purple glow on hover */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.6 }}
-              className="rounded-lg bg-background border border-border/60 p-4 font-mono text-xs space-y-1 relative transition-all duration-300 hover:border-[hsl(270,60%,55%,0.3)] hover:shadow-[0_0_30px_-8px_hsl(270_60%_55%/0.25)]"
+              className="rounded-lg bg-background border border-border/60 p-4 font-mono text-xs space-y-1 relative transition-all duration-300 hover:border-foreground/20 hover:shadow-[0_0_30px_-8px_hsl(0_0%_100%/0.1)]"
             >
               <div className="text-muted-foreground">$ agent.discover("store.com")</div>
-              <div className="text-primary">✓ MIME endpoint found via &lt;link rel="alternate"&gt;</div>
-              <div className="text-primary">✓ 58 products loaded in 142ms</div>
-              <div className="text-primary">✓ Merchant priorities applied (9 rules)</div>
+              <div className="text-foreground/80">✓ MIME endpoint found via &lt;link rel="alternate"&gt;</div>
+              <div className="text-foreground/80">✓ 58 products loaded in 142ms</div>
+              <div className="text-foreground/80">✓ Merchant priorities applied (9 rules)</div>
               <div className="text-muted-foreground">→ Results: structured, fast, reliable</div>
             </motion.div>
           </motion.div>
