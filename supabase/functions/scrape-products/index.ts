@@ -105,40 +105,56 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 2: Scrape product pages in parallel
-    console.log("Step 2: Scraping product pages in parallel...");
+    // Step 2: Scrape product pages in batches to avoid rate limits
+    console.log("Step 2: Scraping product pages in batches...");
     
-    const scrapePromises = productUrls.map(async (pUrl: string) => {
-      try {
-        const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            url: pUrl,
-            formats: ["markdown"],
-            onlyMainContent: true,
-          }),
-        });
+    const scrapedPages: { url: string; markdown: string }[] = [];
+    const concurrency = 10; // scrape 10 at a time
 
-        const scrapeData = await scrapeRes.json();
-        const markdown = scrapeData?.data?.markdown || scrapeData?.markdown;
-        if (scrapeRes.ok && markdown) {
-          return { url: pUrl, markdown: markdown.substring(0, 5000) };
+    for (let i = 0; i < productUrls.length; i += concurrency) {
+      const batch = productUrls.slice(i, i + concurrency);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (pUrl: string) => {
+          try {
+            const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                url: pUrl,
+                formats: ["markdown"],
+                onlyMainContent: true,
+              }),
+            });
+
+            if (!scrapeRes.ok) {
+              const errText = await scrapeRes.text();
+              console.error(`Scrape ${pUrl} failed (${scrapeRes.status}): ${errText.substring(0, 100)}`);
+              return null;
+            }
+
+            const scrapeData = await scrapeRes.json();
+            const markdown = scrapeData?.data?.markdown || scrapeData?.markdown;
+            if (markdown) {
+              return { url: pUrl, markdown: markdown.substring(0, 5000) };
+            }
+          } catch (e) {
+            console.error(`Failed to scrape ${pUrl}:`, e);
+          }
+          return null;
+        })
+      );
+
+      for (const r of batchResults) {
+        if (r.status === "fulfilled" && r.value) {
+          scrapedPages.push(r.value);
         }
-      } catch (e) {
-        console.error(`Failed to scrape ${pUrl}:`, e);
       }
-      return null;
-    });
 
-    const results = await Promise.allSettled(scrapePromises);
-    const scrapedPages = results
-      .filter((r): r is PromiseFulfilledResult<{ url: string; markdown: string } | null> => r.status === "fulfilled")
-      .map(r => r.value)
-      .filter((v): v is { url: string; markdown: string } => v !== null);
+      console.log(`Batch ${Math.floor(i / concurrency) + 1}: scraped ${scrapedPages.length} pages so far`);
+    }
 
     console.log(`Scraped ${scrapedPages.length} pages successfully`);
 
