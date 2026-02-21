@@ -1,43 +1,55 @@
 
 
-## Scroll-Driven Mime Animation
+# Mime Enhancements: Cursor-Following Eyes + Section Divider Wall
 
-### What we're building
-A frame-by-frame mime animation positioned to the left of the "60x faster" stat box in the Comparison section. As the user scrolls, the mime cycles through the uploaded frames, creating a flipbook-style animation effect. More frames will be added later (the user will provide them in batches of 10).
+## 1. Cursor-Following Mime Eyes
 
-### Placement
-The animation will sit to the left of the stats row (the row containing "60x", "100%", "0 Scraping errors"), aligned beside the "60x faster" box specifically.
+A small mime face pinned to the bottom-right corner of the page. Its eyes smoothly track the user's mouse position, creating a playful "someone's watching" effect. On hover, a random witty speech bubble appears.
 
-### Implementation Steps
+**How it works:**
+- Uses `onMouseMove` on the window to get cursor coordinates
+- Calculates eye pupil offset (clamped to a small range) based on cursor position relative to the mime's position
+- Two small circular "pupils" inside drawn eye shapes shift with spring physics
+- Uses the existing `mime-peeking.png` as the base, with CSS-drawn eyes overlaid on top
+- Alternatively, we can build a simple SVG mime face (circle head, beret, two eyes) so the pupils are precisely controllable -- this would look cleaner
 
-1. **Save all 10 frame images** to `src/assets/mime-frames/` directory (frame_000.jpg through frame_009.jpg)
+**Placement:** Fixed bottom-right corner, subtle and small (~80px), visible on desktop only (hidden on mobile). Appears after scrolling past the Hero section.
 
-2. **Create a new component** `src/components/landing/ScrollMimeAnimation.tsx`:
-   - Import all frame images as ES6 modules
-   - Accept a `trackRef` prop (a ref to the section to track scroll progress against)
-   - Use `useScroll` + `useTransform` from framer-motion to map scroll progress to a frame index (0-9 for now, expandable as more frames arrive)
-   - Render an `<img>` tag that swaps its `src` based on the computed frame index
-   - Size it to roughly match the stat box height (~80-100px)
-   - Hidden on small screens (`hidden md:block`)
+## 2. Section Divider Mime ("Invisible Wall")
 
-3. **Update `Comparison.tsx`**:
-   - Import `ScrollMimeAnimation`
-   - Modify the stats row (line 240) layout: wrap it in a flex container with the mime animation on the left and the existing 3-column grid on the right
-   - Pass `sectionRef` as the scroll tracking reference
+A horizontal divider component placed between the Comparison and Wizard sections. The mime character stands in the center, arms pressed out to the sides as if pushing against invisible walls -- acting as a visual "barrier" between sections.
 
-### Technical Details
+**How it works:**
+- A decorative `<div>` with a horizontal line and a centered mime illustration
+- The mime image slides up into view with a spring animation when scrolled into the viewport (`whileInView`)
+- The horizontal lines on either side extend outward from the center (scale-x animation) as if the mime is "pushing" them apart
+- On hover, the mime wiggles as if straining against the walls
 
-```text
-Layout change for stats row:
+**Placement:** Between Comparison and WizardContainer in the Index page layout.
 
-Before:
-[  60x  ] [ 100% ] [  0   ]
+## Technical Details
 
-After:
-[mime anim] [  60x  ] [ 100% ] [  0   ]
-```
+### New files:
+- `src/components/landing/MimeEyes.tsx` -- cursor-following eyes component
+- `src/components/landing/MimeDivider.tsx` -- section divider component
 
-- Scroll-to-frame mapping: `useTransform(scrollYProgress, [0, 1], [0, totalFrames - 1])` rounded to nearest integer
-- The component will be designed to easily accept more frames later -- frames stored in an array that just needs appending
-- Each frame is ~42ms apart in the original animation, but here scroll speed controls playback
+### Modified files:
+- `src/pages/Index.tsx` -- add both new components to the page layout
 
+### Dependencies:
+- Framer Motion (already installed) for animations and spring physics
+- No new assets required for the eyes (SVG-drawn face)
+- Will reuse existing `mime-peeking.png` for the divider, or draw a simple SVG mime silhouette
+
+### MimeEyes component approach:
+- Track `window.mousemove` via `useEffect`
+- Store mouse `{ x, y }` in state (throttled)
+- Calculate pupil offset: `dx = clamp((mouseX - eyeCenterX) / distance, -maxOffset, maxOffset)`
+- Render an SVG: circle face, beret shape, two eye whites with animated pupil circles
+- Wrap in `motion.div` with fixed positioning and scroll-based opacity
+
+### MimeDivider component approach:
+- `whileInView` trigger for entrance animation
+- Two `motion.div` horizontal lines with `scaleX: [0, 1]` animation
+- Center mime image with `y: [20, 0]` and `opacity: [0, 1]` entrance
+- `whileHover` wiggle animation on the mime
