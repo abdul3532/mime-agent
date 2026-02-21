@@ -34,6 +34,8 @@ interface DashboardContextType {
   saveProducts: () => Promise<void>;
   saveRules: () => Promise<void>;
   reloadProducts: () => Promise<void>;
+  seedDemoProducts: () => Promise<void>;
+  seeding: boolean;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -49,6 +51,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [rescanning, setRescanning] = useState(false);
   const [scanStep, setScanStep] = useState("");
   const [lastScannedAt, setLastScannedAt] = useState<Date | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   // Load products from DB
   useEffect(() => {
@@ -165,6 +168,35 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     toast({ title: "Saved", description: "Rules saved to database." });
   }, [user, rules, toast]);
 
+  const seedDemoProducts = useCallback(async () => {
+    if (!user) return;
+    setSeeding(true);
+    try {
+      const { mockProducts } = await import("@/data/mockProducts");
+      const inserts = mockProducts.map((p) => ({
+        user_id: user.id,
+        title: p.title,
+        price: p.price,
+        currency: p.currency,
+        availability: p.availability,
+        category: p.category,
+        tags: p.tags,
+        inventory: p.inventory,
+        url: p.url,
+        image: p.image,
+        boost_score: p.boostScore,
+        included: p.included,
+      }));
+      await supabase.from("products").insert(inserts);
+      await reloadProducts();
+      toast({ title: "Demo loaded", description: "Sample products added to your dashboard." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to load demo data.", variant: "destructive" });
+    } finally {
+      setSeeding(false);
+    }
+  }, [user, reloadProducts, toast]);
+
     return (
     <DashboardContext.Provider value={{
       products, setProducts, updateProduct,
@@ -175,6 +207,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       scanStep, setScanStep,
       lastScannedAt, setLastScannedAt,
       saveProducts, saveRules, reloadProducts,
+      seedDemoProducts, seeding,
     }}>
       {children}
     </DashboardContext.Provider>

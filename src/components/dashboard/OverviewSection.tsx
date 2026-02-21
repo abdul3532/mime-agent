@@ -92,7 +92,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function OverviewSection() {
-  const { products, setProducts, appliedSuggestions, applySuggestion, updateProduct } = useDashboard();
+  const { products, setProducts, appliedSuggestions, applySuggestion, updateProduct, seedDemoProducts, seeding } = useDashboard();
   const { toast } = useToast();
 
   const [kpiDialog, setKpiDialog] = useState<string | null>(null);
@@ -155,6 +155,26 @@ export function OverviewSection() {
   };
 
   const availProducts = availDialog ? products.filter((p) => p.availability === availDialog) : [];
+
+  if (products.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h2 className="font-heading text-2xl font-bold">Overview</h2>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border/50 bg-card p-12 text-center">
+          <Package className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No products yet</h3>
+          <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+            Connect your store and scan for products, or load demo data to explore the dashboard.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <Button onClick={seedDemoProducts} disabled={seeding}>
+              {seeding ? "Loading..." : "Load demo data"}
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

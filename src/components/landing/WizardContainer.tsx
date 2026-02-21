@@ -152,104 +152,110 @@ export function WizardContainer() {
 
           {/* Active step content */}
           <div className="flex-1 space-y-5">
-            <AnimatePresence mode="wait">
-              {/* Step 1 */}
-              <div ref={(el) => (stepRefs.current[0] = el)}>
+            {/* Step 1 */}
+            <div ref={(el) => (stepRefs.current[0] = el)}>
+              <AnimatePresence mode="wait">
                 {currentStep === 0 && (
-                  <motion.div key="step1" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="card-elevated p-8 step-active">
+                  <motion.div key="step1-active" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="card-elevated p-8 step-active">
                     <StepUrl onComplete={(url) => { setStoreUrl(url); advanceStep(); }} />
                   </motion.div>
                 )}
-                {currentStep > 0 && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.7 }} whileHover={{ opacity: 1 }} onClick={() => { setCurrentStep(0); scrollToStep(0); }} className="card-elevated p-4 step-completed border-accent/40 cursor-pointer hover:border-primary/40 transition-colors">
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-accent" />
-                      <span className="font-medium">Store connected</span>
-                      <span className="text-muted-foreground ml-auto text-xs">{storeUrl}</span>
-                      <ChevronLeft className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+              </AnimatePresence>
+              {currentStep > 0 && (
+                <div onClick={() => { setCurrentStep(0); scrollToStep(0); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-accent" />
+                    <span className="font-medium">Store connected</span>
+                    <span className="text-muted-foreground ml-auto text-xs">{storeUrl}</span>
+                    <ChevronLeft className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </div>
+              )}
+            </div>
 
-              {/* Step 2 */}
-              <div ref={(el) => (stepRefs.current[1] = el)}>
+            {/* Step 2 */}
+            <div ref={(el) => (stepRefs.current[1] = el)}>
+              <AnimatePresence mode="wait">
                 {currentStep === 1 && (
-                  <motion.div key="step2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
+                  <motion.div key="step2-active" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
                     <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
                       <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
                     <StepChat onComplete={advanceStep} />
                   </motion.div>
                 )}
-                {currentStep > 1 && (
-                  <div onClick={() => { setCurrentStep(1); scrollToStep(1); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-accent" />
-                      <span className="font-medium">Priorities configured</span>
-                      <ChevronLeft className="h-3 w-3 text-muted-foreground ml-auto" />
-                    </div>
+              </AnimatePresence>
+              {currentStep > 1 && (
+                <div onClick={() => { setCurrentStep(1); scrollToStep(1); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-accent" />
+                    <span className="font-medium">Priorities configured</span>
+                    <ChevronLeft className="h-3 w-3 text-muted-foreground ml-auto" />
                   </div>
-                )}
-                {currentStep < 1 && (
-                  <div className="card-elevated p-6 step-locked">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Lock className="h-4 w-4" />
-                      <span>Set priorities — complete Step 1 first</span>
-                    </div>
+                </div>
+              )}
+              {currentStep < 1 && (
+                <div className="card-elevated p-6 step-locked">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    <span>Set priorities — complete Step 1 first</span>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
 
-              {/* Step 3 */}
-              <div ref={(el) => (stepRefs.current[2] = el)}>
+            {/* Step 3 */}
+            <div ref={(el) => (stepRefs.current[2] = el)}>
+              <AnimatePresence mode="wait">
                 {currentStep === 2 && (
-                  <motion.div key="step3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
+                  <motion.div key="step3-active" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
                     <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
                       <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
                     <StepCrawl storeUrl={storeUrl} onComplete={advanceStep} />
                   </motion.div>
                 )}
-                {currentStep > 2 && (
-                  <div onClick={() => { setCurrentStep(2); scrollToStep(2); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-accent" />
-                      <span className="font-medium">Scan complete — products indexed</span>
-                      <ChevronLeft className="h-3 w-3 text-muted-foreground ml-auto" />
-                    </div>
+              </AnimatePresence>
+              {currentStep > 2 && (
+                <div onClick={() => { setCurrentStep(2); scrollToStep(2); }} className="card-elevated p-4 step-completed border-accent/40 opacity-70 cursor-pointer hover:opacity-100 hover:border-primary/40 transition-all">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-accent" />
+                    <span className="font-medium">Scan complete — products indexed</span>
+                    <ChevronLeft className="h-3 w-3 text-muted-foreground ml-auto" />
                   </div>
-                )}
-                {currentStep < 2 && (
-                  <div className="card-elevated p-6 step-locked">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Lock className="h-4 w-4" />
-                      <span>Scan & complete — complete previous steps</span>
-                    </div>
+                </div>
+              )}
+              {currentStep < 2 && (
+                <div className="card-elevated p-6 step-locked">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    <span>Scan & complete — complete previous steps</span>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
 
-              {/* Step 4 */}
-              <div ref={(el) => (stepRefs.current[3] = el)}>
+            {/* Step 4 */}
+            <div ref={(el) => (stepRefs.current[3] = el)}>
+              <AnimatePresence mode="wait">
                 {currentStep === 3 && (
-                  <motion.div key="step4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
+                  <motion.div key="step4-active" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: 0.1 }} className="card-elevated p-8 step-active">
                     <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
                       <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
                     <StepInstall storeId={storeId} />
                   </motion.div>
                 )}
-                {currentStep < 3 && (
-                  <div className="card-elevated p-6 step-locked">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Lock className="h-4 w-4" />
-                      <span>Install & verify — complete previous steps</span>
-                    </div>
+              </AnimatePresence>
+              {currentStep < 3 && (
+                <div className="card-elevated p-6 step-locked">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    <span>Install & verify — complete previous steps</span>
                   </div>
-                )}
-              </div>
-            </AnimatePresence>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
