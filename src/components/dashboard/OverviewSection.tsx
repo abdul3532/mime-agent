@@ -1,6 +1,31 @@
 import { motion } from "framer-motion";
 import { mockProducts } from "@/data/mockProducts";
 import { Package, Layers, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { useCountUp } from "@/hooks/useCountUp";
+
+function KpiCard({ label, value, icon: Icon, index }: { label: string; value: number; icon: React.ElementType; index: number }) {
+  const { count, ref } = useCountUp(value, 1200);
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08 }}
+      className="card-interactive p-5"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <div className="text-2xl font-bold font-heading tabular-nums">{count}</div>
+          <div className="text-xs text-muted-foreground">{label}</div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export function OverviewSection() {
   const topProducts = [...mockProducts]
@@ -12,7 +37,7 @@ export function OverviewSection() {
     { label: "Products indexed", value: mockProducts.length, icon: Package },
     { label: "Categories", value: 6, icon: Layers },
     { label: "Rules active", value: 9, icon: SlidersHorizontal },
-    { label: "Avg boost score", value: "6.2", icon: TrendingUp },
+    { label: "Avg boost score", value: 6, icon: TrendingUp },
   ];
 
   return (
@@ -21,23 +46,7 @@ export function OverviewSection() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((k, i) => (
-          <motion.div
-            key={k.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="card-interactive p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center transition-colors duration-300 group-hover:bg-primary">
-                <k.icon className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold font-heading">{k.value}</div>
-                <div className="text-xs text-muted-foreground">{k.label}</div>
-              </div>
-            </div>
-          </motion.div>
+          <KpiCard key={k.label} label={k.label} value={k.value} icon={k.icon} index={i} />
         ))}
       </div>
 

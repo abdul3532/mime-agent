@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import mimeLogo from "@/assets/mime-logo.png";
 
 const navLinks = [
   { label: "Product", href: "#hero" },
@@ -38,8 +39,8 @@ export function Navbar() {
       }`}
     >
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="font-heading text-xl font-extrabold tracking-tight text-primary">
-          MIME
+        <Link to="/" className="flex items-center">
+          <img src={mimeLogo} alt="MIME" className="h-14 -my-3" />
         </Link>
 
         {/* Desktop */}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
@@ -44,7 +45,7 @@ const Dashboard = () => {
           <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs opacity-60 hover:opacity-100 transition-all duration-200 mb-4 hover:translate-x-[-2px]">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to home
           </button>
-          <span className="font-heading text-2xl font-extrabold tracking-tight">MIME</span>
+          <img src={mimeLogo} alt="MIME" className="h-7 brightness-0 invert" />
           <p className="text-xs opacity-50 mt-1">Storefront Manager</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
