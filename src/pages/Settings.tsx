@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import mimeLogo from "@/assets/mime-logo.png";
-import { ArrowLeft, Save, Store, Globe, Image, User, Mail } from "lucide-react";
+import { ArrowLeft, Save, Store, Globe, Upload, User, Mail, X } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [storeName, setStoreName] = useState("");
   const [domain, setDomain] = useState("");
@@ -22,6 +23,7 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +43,44 @@ export default function Settings() {
     };
     load();
   }, [user]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please upload an image file.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Logo must be under 2MB.", variant: "destructive" });
+      return;
+    }
+
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `${user.id}/logo.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("store-logos")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
+      setUploading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("store-logos").getPublicUrl(path);
+    const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
+    setStoreLogoUrl(publicUrl);
+    setUploading(false);
+    toast({ title: "Uploaded", description: "Logo uploaded successfully." });
+  };
+
+  const removeLogo = () => {
+    setStoreLogoUrl("");
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -110,12 +150,38 @@ export default function Settings() {
             <Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" />
           </div>
 
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2"><Image className="h-3.5 w-3.5" /> Store Logo URL</Label>
-            <Input value={storeLogoUrl} onChange={(e) => setStoreLogoUrl(e.target.value)} placeholder="https://..." />
-            {storeLogoUrl && (
-              <img src={storeLogoUrl} alt="Logo preview" className="h-12 w-12 rounded-lg object-cover border border-border mt-2" />
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2"><Upload className="h-3.5 w-3.5" /> Store Logo</Label>
+            {storeLogoUrl ? (
+              <div className="flex items-center gap-4">
+                <img src={storeLogoUrl} alt="Store logo" className="h-16 w-16 rounded-xl object-cover border border-border" />
+                <div className="flex flex-col gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    {uploading ? "Uploading..." : "Change"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={removeLogo} className="text-destructive hover:text-destructive">
+                    <X className="h-3.5 w-3.5 mr-1" /> Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full h-28 rounded-xl border-2 border-dashed border-border hover:border-primary/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
+              >
+                <Upload className="h-6 w-6" />
+                <span className="text-sm">{uploading ? "Uploading..." : "Click to upload logo"}</span>
+                <span className="text-xs text-muted-foreground">PNG, JPG, SVG · Max 2MB</span>
+              </button>
             )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
           </div>
         </div>
 
