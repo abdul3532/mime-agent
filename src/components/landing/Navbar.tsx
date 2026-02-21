@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import mimeLogo from "@/assets/mime-logo.png";
+import { useTheme } from "@/components/ThemeProvider";
 
 const navLinks = [
   { label: "Product", href: "#hero" },
@@ -16,6 +17,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -43,7 +45,7 @@ export function Navbar() {
           <img
             src={mimeLogo}
             alt="MIME"
-            className="h-36 -my-14 brightness-0 invert transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_20px_hsl(var(--primary)/0.5)]"
+            className={`h-36 -my-14 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_20px_hsl(var(--primary)/0.5)] ${theme === "dark" ? "brightness-0 invert" : ""}`}
           />
         </Link>
 
@@ -59,6 +61,9 @@ export function Navbar() {
               <span className="absolute -bottom-1 left-0 w-0 h-px bg-primary transition-all duration-300 group-hover:w-full" />
             </button>
           ))}
+          <button onClick={toggle} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <Button size="sm" onClick={() => handleNav("#wizard")} className="btn-glow">
             Start demo
           </Button>

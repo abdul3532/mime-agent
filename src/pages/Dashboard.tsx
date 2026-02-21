@@ -4,8 +4,9 @@ import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
-  Search, Bell, Settings, HelpCircle,
+  Search, Bell, Settings, HelpCircle, Sun, Moon,
 } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OverviewSection } from "@/components/dashboard/OverviewSection";
@@ -45,6 +46,7 @@ const Dashboard = () => {
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { theme, toggle } = useTheme();
   const storeUrl = localStorage.getItem("mime_store_url") || "https://example-store.com";
   const storeId = localStorage.getItem("mime_store_id") || "store_demo123";
   const storeName = new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname;
@@ -64,7 +66,7 @@ const Dashboard = () => {
           <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-all duration-200 mb-3 hover:translate-x-[-2px]">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to home
           </button>
-          <img src={mimeLogo} alt="MIME" className="h-12 -my-2 brightness-0 invert" />
+          <img src={mimeLogo} alt="MIME" className={`h-12 -my-2 ${theme === "dark" ? "brightness-0 invert" : ""}`} />
         </div>
 
         <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
@@ -145,6 +147,9 @@ const Dashboard = () => {
             }`}>
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </span>
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={toggle}>
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground">
               <Bell className="h-4 w-4" />
             </Button>
