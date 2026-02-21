@@ -212,22 +212,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 3: Extract structured product data using AI
+    // Step 3: Extract structured product data using AI + incremental save
     await updateProgress({ status: "extracting" });
     console.log("Step 3: Extracting product data with AI...");
-    const allProducts: any[] = [];
 
+    // Delete existing products upfront so incremental inserts work
+    await adminClient.from("products").delete().eq("user_id", userId);
+
+    let totalExtracted = 0;
+    const allCategories: Set<string> = new Set();
     const aiBatchSize = 10;
-    const aiConcurrency = 3;
-    const aiBatches: { url: string; markdown: string }[][] = [];
-    for (let i = 0; i < scrapedPages.length; i += aiBatchSize) {
-      aiBatches.push(scrapedPages.slice(i, i + aiBatchSize));
-    }
 
-    for (let i = 0; i < aiBatches.length; i += aiConcurrency) {
-      const concurrentBatches = aiBatches.slice(i, i + aiConcurrency);
-      const batchResults = await Promise.allSettled(
-        concurrentBatches.map(async (batch) => {
+    for (let i = 0; i < scrapedPages.length; i += aiBatchSize) {
+      const batch = scrapedPages.slice(i, i + aiBatchSize);
       const pagesText = batch
         .map((p, idx) => `--- PAGE ${idx + 1} (${p.url}) ---\n${p.markdown}`)
         .join("\n\n");
@@ -313,78 +310,60 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
         if (!aiRes.ok) {
           const errText = await aiRes.text();
           console.error(`AI extraction failed (${aiRes.status}):`, errText.substring(0, 200));
-          return [];
+          continue;
         }
 
         const aiData = await aiRes.json();
         const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
         if (toolCall?.function?.arguments) {
           const parsed = JSON.parse(toolCall.function.arguments);
-          if (Array.isArray(parsed.products)) {
-            return parsed.products;
+          if (Array.isArray(parsed.products) && parsed.products.length > 0) {
+            // Incremental save — insert immediately
+            const rows = parsed.products.map((p: any) => ({
+              user_id: userId,
+              title: p.title || "Untitled Product",
+              price: p.price || 0,
+              currency: p.currency || "EUR",
+              category: p.category || "General",
+              availability: p.availability || "in_stock",
+              image: p.image || null,
+              tags: p.tags || [],
+              inventory: p.inventory || 100,
+              url: p.url || null,
+              boost_score: 5,
+              included: true,
+            }));
+
+            const { error: insertErr } = await adminClient.from("products").insert(rows);
+            if (insertErr) {
+              console.error("Incremental insert error:", insertErr.message);
+            } else {
+              totalExtracted += parsed.products.length;
+              for (const p of parsed.products) {
+                if (p.category) allCategories.add(p.category);
+              }
+            }
+            await updateProgress({ extracted_products: totalExtracted });
           }
         }
-        return [];
       } catch (e) {
         console.error("AI extraction error:", e);
-        return [];
       }
-        })
-      );
 
-      for (const r of batchResults) {
-        if (r.status === "fulfilled" && Array.isArray(r.value)) {
-          allProducts.push(...r.value);
-        }
-      }
-      await updateProgress({ extracted_products: allProducts.length });
+      console.log(`AI batch ${Math.floor(i / aiBatchSize) + 1}: ${totalExtracted} products saved so far`);
     }
 
-    console.log(`Extracted ${allProducts.length} products`);
+    console.log(`Extracted ${totalExtracted} products`);
 
-    // Step 4: Persist to database
-    await updateProgress({ status: "saving" });
-    console.log("Step 4: Persisting products...");
+    const categories = [...allCategories];
 
-    // Delete existing products for this user
-    await adminClient.from("products").delete().eq("user_id", userId);
-
-    if (allProducts.length > 0) {
-      const rows = allProducts.map((p) => ({
-        user_id: userId,
-        title: p.title || "Untitled Product",
-        price: p.price || 0,
-        currency: p.currency || "EUR",
-        category: p.category || "General",
-        availability: p.availability || "in_stock",
-        image: p.image || null,
-        tags: p.tags || [],
-        inventory: p.inventory || 100,
-        url: p.url || null,
-        boost_score: 5,
-        included: true,
-      }));
-
-      const { error: insertError } = await adminClient.from("products").insert(rows);
-      if (insertError) {
-        console.error("Insert error:", insertError);
-        await updateProgress({ status: "error", error_message: insertError.message });
-        return new Response(
-          JSON.stringify({ error: "Failed to save products", details: insertError.message }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    const categories = [...new Set(allProducts.map((p) => p.category).filter(Boolean))];
-
-    await updateProgress({ status: "done", extracted_products: allProducts.length });
-    console.log("Done! Products:", allProducts.length, "Categories:", categories.length);
+    await updateProgress({ status: "done", extracted_products: totalExtracted });
+    console.log("Done! Products:", totalExtracted, "Categories:", categories.length);
 
     return new Response(
       JSON.stringify({
         success: true,
-        products_found: allProducts.length,
+        products_found: totalExtracted,
         categories,
         pages_scanned: scrapedPages.length,
         runId,
