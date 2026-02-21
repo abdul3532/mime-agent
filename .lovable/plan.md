@@ -1,55 +1,91 @@
 
 
-# Mime Enhancements: Cursor-Following Eyes + Section Divider Wall
+# Full Demo and Dashboard Fix Plan
 
-## 1. Cursor-Following Mime Eyes
+## Problem Summary
 
-A small mime face pinned to the bottom-right corner of the page. Its eyes smoothly track the user's mouse position, creating a playful "someone's watching" effect. On hover, a random witty speech bubble appears.
+The app has several issues preventing a complete working demo:
 
-**How it works:**
-- Uses `onMouseMove` on the window to get cursor coordinates
-- Calculates eye pupil offset (clamped to a small range) based on cursor position relative to the mime's position
-- Two small circular "pupils" inside drawn eye shapes shift with spring physics
-- Uses the existing `mime-peeking.png` as the base, with CSS-drawn eyes overlaid on top
-- Alternatively, we can build a simple SVG mime face (circle head, beret, two eyes) so the pupils are precisely controllable -- this would look cleaner
+1. **Empty dashboard**: The user has 0 products in the database, so all KPIs show 0, charts are empty, and the products table is blank.
+2. **No demo/seed data path**: New users who haven't scanned a store see a completely empty, uninviting dashboard with no guidance.
+3. **Duplicate key warning**: The `WizardContainer` has an `AnimatePresence` wrapping multiple step divs with potential key collisions.
+4. **Wizard doesn't gate auth early enough**: Step 3 (Crawl) requires auth but the user doesn't know until they reach it.
 
-**Placement:** Fixed bottom-right corner, subtle and small (~80px), visible on desktop only (hidden on mobile). Appears after scrolling past the Hero section.
+## Plan
 
-## 2. Section Divider Mime ("Invisible Wall")
+### 1. Seed demo products for empty dashboards
 
-A horizontal divider component placed between the Comparison and Wizard sections. The mime character stands in the center, arms pressed out to the sides as if pushing against invisible walls -- acting as a visual "barrier" between sections.
+When the dashboard loads and finds 0 products, show an "empty state" with a prominent option to either:
+- **Load demo data** (insert mock products into the DB for this user so all dashboard features work)
+- **Scan a store** (redirect to wizard or trigger re-scan)
 
-**How it works:**
-- A decorative `<div>` with a horizontal line and a centered mime illustration
-- The mime image slides up into view with a spring animation when scrolled into the viewport (`whileInView`)
-- The horizontal lines on either side extend outward from the center (scale-x animation) as if the mime is "pushing" them apart
-- On hover, the mime wiggles as if straining against the walls
+This uses the existing `mockProducts` data, inserting them into the `products` table with the user's `user_id`.
 
-**Placement:** Between Comparison and WizardContainer in the Index page layout.
+**File**: `src/components/dashboard/OverviewSection.tsx` -- add empty state UI at the top when `products.length === 0`
+
+**File**: `src/context/DashboardContext.tsx` -- add a `seedDemoProducts()` function that inserts mockProducts into the DB
+
+### 2. Fix duplicate key warning in WizardContainer
+
+The `AnimatePresence` in `WizardContainer.tsx` wraps all 4 step divs, but the conditional rendering means multiple `motion.div` elements can share the `key` attribute pattern. Fix by ensuring each step block has a unique, stable key and only the active one is inside the `AnimatePresence`.
+
+**File**: `src/components/landing/WizardContainer.tsx` -- restructure the step rendering to use unique keys
+
+### 3. Add empty states to Products and Rules sections
+
+When there are 0 products, show a friendly empty state in:
+- **ProductsSection**: "No products yet" with buttons to load demo data or scan a store
+- **RulesSection**: Already has default rule templates, but show guidance when no products exist
+
+**Files**: `src/components/dashboard/ProductsSection.tsx`, `src/components/dashboard/RulesSection.tsx`
+
+### 4. Dashboard "no store connected" guidance
+
+When `storeUrl` is empty in Dashboard, show a banner prompting the user to connect a store or load demo data, instead of silently showing "No store connected" in the header.
+
+**File**: `src/pages/Dashboard.tsx` -- add a top banner when no store URL is set
 
 ## Technical Details
 
-### New files:
-- `src/components/landing/MimeEyes.tsx` -- cursor-following eyes component
-- `src/components/landing/MimeDivider.tsx` -- section divider component
+### seedDemoProducts function (DashboardContext)
 
-### Modified files:
-- `src/pages/Index.tsx` -- add both new components to the page layout
+```typescript
+const seedDemoProducts = async () => {
+  if (!user) return;
+  const { mockProducts } = await import("@/data/mockProducts");
+  const inserts = mockProducts.map((p) => ({
+    user_id: user.id,
+    title: p.title,
+    price: p.price,
+    currency: p.currency,
+    availability: p.availability,
+    category: p.category,
+    tags: p.tags,
+    inventory: p.inventory,
+    url: p.url,
+    image: p.image,
+    boost_score: p.boostScore,
+    included: p.included,
+  }));
+  await supabase.from("products").insert(inserts);
+  await reloadProducts();
+  toast({ title: "Demo loaded", description: "Sample products added to your dashboard." });
+};
+```
 
-### Dependencies:
-- Framer Motion (already installed) for animations and spring physics
-- No new assets required for the eyes (SVG-drawn face)
-- Will reuse existing `mime-peeking.png` for the divider, or draw a simple SVG mime silhouette
+### WizardContainer key fix
 
-### MimeEyes component approach:
-- Track `window.mousemove` via `useEffect`
-- Store mouse `{ x, y }` in state (throttled)
-- Calculate pupil offset: `dx = clamp((mouseX - eyeCenterX) / distance, -maxOffset, maxOffset)`
-- Render an SVG: circle face, beret shape, two eye whites with animated pupil circles
-- Wrap in `motion.div` with fixed positioning and scroll-based opacity
+Move the `AnimatePresence` to wrap only the active step content, not the entire step list. Each conditional block already has unique keys (`step1`, `step2`, etc.) but the parent divs (step refs) are all rendered simultaneously inside `AnimatePresence`, causing duplicate key issues.
 
-### MimeDivider component approach:
-- `whileInView` trigger for entrance animation
-- Two `motion.div` horizontal lines with `scaleX: [0, 1]` animation
-- Center mime image with `y: [20, 0]` and `opacity: [0, 1]` entrance
-- `whileHover` wiggle animation on the mime
+### Empty state component pattern
+
+A reusable empty state block with an illustration (Package icon), title, description, and action buttons (Load demo / Scan store).
+
+### Files to modify
+
+- `src/context/DashboardContext.tsx` -- add `seedDemoProducts` to context
+- `src/components/dashboard/OverviewSection.tsx` -- add empty state when 0 products
+- `src/components/dashboard/ProductsSection.tsx` -- add empty state when 0 products
+- `src/components/landing/WizardContainer.tsx` -- fix duplicate key warning
+- `src/pages/Dashboard.tsx` -- add store connection banner
+
