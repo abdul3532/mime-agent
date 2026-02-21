@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Search, CheckCircle2, FileText, Tag, AlertTriangle } from "lucide-react";
+import { Search, CheckCircle2, FileText, Tag, AlertTriangle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { scrapeProducts, ScrapeResult } from "@/lib/api/scrapeProducts";
 
 interface Props {
   storeUrl: string;
@@ -18,43 +19,49 @@ const stages = [
 
 export function StepCrawl({ storeUrl, onComplete }: Props) {
   const navigate = useNavigate();
-  const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState(0);
   const [done, setDone] = useState(false);
-  const [counters, setCounters] = useState({ pages: 0, products: 0, collections: 0, warnings: 0 });
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ScrapeResult | null>(null);
 
   useEffect(() => {
-    const totalDuration = 7000;
-    const interval = 50;
-    let elapsed = 0;
+    let cancelled = false;
 
-    const timer = setInterval(() => {
-      elapsed += interval;
-      const pct = Math.min((elapsed / totalDuration) * 100, 100);
-      setProgress(pct);
+    async function run() {
+      setStage(0);
+      setError(null);
 
-      // Update stage
-      if (pct < 25) setStage(0);
-      else if (pct < 50) setStage(1);
-      else if (pct < 75) setStage(2);
-      else setStage(3);
+      // Simulate stage progression while the API call runs
+      const stageTimer = setInterval(() => {
+        setStage((prev) => (prev < 2 ? prev + 1 : prev));
+      }, 5000);
 
-      // Update counters
-      setCounters({
-        pages: Math.min(Math.floor(pct * 1.2), 120),
-        products: Math.min(Math.floor(pct * 0.58), 58),
-        collections: Math.min(Math.floor(pct * 0.06), 6),
-        warnings: pct > 60 ? 2 : pct > 30 ? 1 : 0,
-      });
+      try {
+        const res = await scrapeProducts(storeUrl);
+        clearInterval(stageTimer);
+        if (cancelled) return;
 
-      if (pct >= 100) {
-        clearInterval(timer);
-        setDone(true);
+        if (!res.success) {
+          setError(res.error || "Scraping failed");
+          return;
+        }
+
+        setStage(3);
+        setResult(res);
+
+        // Brief pause to show final stage
+        setTimeout(() => {
+          if (!cancelled) setDone(true);
+        }, 800);
+      } catch (e) {
+        clearInterval(stageTimer);
+        if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
       }
-    }, interval);
+    }
 
-    return () => clearInterval(timer);
-  }, []);
+    run();
+    return () => { cancelled = true; };
+  }, [storeUrl]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -69,34 +76,20 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       </div>
 
       {/* Progress bar */}
-      <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-        <div className="progress-fill h-full rounded-full" style={{ width: `${progress}%` }} />
-      </div>
-
-      {/* Counters */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { icon: FileText, label: "Pages scanned", value: counters.pages },
-          { icon: Tag, label: "Products found", value: counters.products },
-          { icon: Search, label: "Collections inferred", value: counters.collections },
-          { icon: AlertTriangle, label: "Warnings", value: counters.warnings },
-        ].map((c) => (
-          <div key={c.label} className="bg-muted/30 border rounded-lg p-3 text-center">
-            <c.icon className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <div className="text-xl font-bold font-heading">{c.value}</div>
-            <div className="text-xs text-muted-foreground">{c.label}</div>
-          </div>
-        ))}
-      </div>
+      {!done && !error && (
+        <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+          <div className="progress-fill h-full rounded-full animate-pulse" style={{ width: `${((stage + 1) / stages.length) * 100}%`, transition: "width 1s ease" }} />
+        </div>
+      )}
 
       {/* Stage stepper */}
       <div className="space-y-2">
         {stages.map((s, i) => (
           <div key={s} className="flex items-center gap-3 text-sm">
             <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-              i < stage ? "bg-accent text-accent-foreground" :
-              i === stage && !done ? "bg-primary text-primary-foreground animate-pulse" :
-              done ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+              i < stage || done ? "bg-accent text-accent-foreground" :
+              i === stage && !done && !error ? "bg-primary text-primary-foreground animate-pulse" :
+              "bg-muted text-muted-foreground"
             }`}>
               {i < stage || done ? "✓" : i + 1}
             </div>
@@ -105,25 +98,48 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         ))}
       </div>
 
-      {done && (
+      {/* Error state */}
+      {error && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+          <div className="flex items-center gap-2 text-destructive font-semibold">
+            <XCircle className="h-5 w-5" />
+            Scan failed
+          </div>
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </motion.div>
+      )}
+
+      {/* Success state */}
+      {done && result && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           <div className="flex items-center gap-2 text-accent-foreground font-semibold">
             <CheckCircle2 className="h-5 w-5 text-accent" />
             Scan complete
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="card-elevated p-4 text-center">
-              <div className="text-2xl font-bold font-heading">58</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-muted/30 border rounded-lg p-3 text-center">
+              <FileText className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="text-xl font-bold font-heading">{result.pages_scanned}</div>
+              <div className="text-xs text-muted-foreground">Pages scanned</div>
+            </div>
+            <div className="bg-muted/30 border rounded-lg p-3 text-center">
+              <Tag className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="text-xl font-bold font-heading">{result.products_found}</div>
               <div className="text-xs text-muted-foreground">Products found</div>
             </div>
-            <div className="card-elevated p-4 text-center">
-              <div className="text-2xl font-bold font-heading">6</div>
-              <div className="text-xs text-muted-foreground">Top categories</div>
+            <div className="bg-muted/30 border rounded-lg p-3 text-center">
+              <Search className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="text-xl font-bold font-heading">{result.categories.length}</div>
+              <div className="text-xs text-muted-foreground">Categories</div>
             </div>
-            <div className="card-elevated p-4 text-center">
-              <div className="text-2xl font-bold font-heading">9</div>
-              <div className="text-xs text-muted-foreground">Rules applied</div>
+            <div className="bg-muted/30 border rounded-lg p-3 text-center">
+              <AlertTriangle className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="text-xl font-bold font-heading">0</div>
+              <div className="text-xs text-muted-foreground">Warnings</div>
             </div>
           </div>
 
@@ -136,6 +152,11 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
             </Button>
           </div>
         </motion.div>
+      )}
+
+      {/* Loading indicator */}
+      {!done && !error && (
+        <p className="text-xs text-muted-foreground animate-pulse">This may take 30–60 seconds depending on the site size...</p>
       )}
     </motion.div>
   );

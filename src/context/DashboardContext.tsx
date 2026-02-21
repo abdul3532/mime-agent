@@ -27,6 +27,7 @@ interface DashboardContextType {
   loading: boolean;
   saveProducts: () => Promise<void>;
   saveRules: () => Promise<void>;
+  reloadProducts: () => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -91,6 +92,35 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setAppliedSuggestions((prev) => new Set(prev).add(index));
   }, []);
 
+  const reloadProducts = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data: dbProducts } = await supabase
+      .from("products")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at");
+
+    if (dbProducts) {
+      setProducts(dbProducts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        price: Number(p.price),
+        currency: p.currency,
+        availability: p.availability as Product["availability"],
+        category: p.category,
+        tags: p.tags || [],
+        margin: 0,
+        inventory: p.inventory,
+        url: p.url || "",
+        image: p.image || "",
+        boostScore: p.boost_score,
+        included: p.included,
+      })));
+    }
+    setLoading(false);
+  }, [user]);
+
   const saveProducts = useCallback(async () => {
     if (!user) return;
     for (const p of products) {
@@ -105,7 +135,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const saveRules = useCallback(async () => {
     if (!user) return;
-    // Delete all, re-insert
     await supabase.from("rules").delete().eq("user_id", user.id);
     const inserts = rules.map((r) => ({
       user_id: user.id,
@@ -128,7 +157,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       rules, setRules,
       appliedSuggestions, applySuggestion,
       activeTab, setActiveTab,
-      loading, saveProducts, saveRules,
+      loading, saveProducts, saveRules, reloadProducts,
     }}>
       {children}
     </DashboardContext.Provider>
