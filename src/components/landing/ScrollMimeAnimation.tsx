@@ -21,12 +21,24 @@ import frame016 from "@/assets/mime-frames/frame_016.jpg";
 import frame017 from "@/assets/mime-frames/frame_017.jpg";
 import frame018 from "@/assets/mime-frames/frame_018.jpg";
 import frame019 from "@/assets/mime-frames/frame_019.jpg";
+import frame020 from "@/assets/mime-frames/frame_020.jpg";
+import frame021 from "@/assets/mime-frames/frame_021.jpg";
+import frame022 from "@/assets/mime-frames/frame_022.jpg";
+import frame023 from "@/assets/mime-frames/frame_023.jpg";
+import frame024 from "@/assets/mime-frames/frame_024.jpg";
+import frame025 from "@/assets/mime-frames/frame_025.jpg";
+import frame026 from "@/assets/mime-frames/frame_026.jpg";
+import frame027 from "@/assets/mime-frames/frame_027.jpg";
+import frame028 from "@/assets/mime-frames/frame_028.jpg";
+import frame029 from "@/assets/mime-frames/frame_029.jpg";
 
 const frames = [
   frame000, frame001, frame002, frame003, frame004,
   frame005, frame006, frame007, frame008, frame009,
   frame010, frame011, frame012, frame013, frame014,
   frame015, frame016, frame017, frame018, frame019,
+  frame020, frame021, frame022, frame023, frame024,
+  frame025, frame026, frame027, frame028, frame029,
 ];
 
 interface ScrollMimeAnimationProps {
