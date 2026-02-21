@@ -4,9 +4,10 @@ import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
-  Search, Bell, Settings, HelpCircle, Sun, Moon,
+  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DashboardProvider, useDashboard } from "@/context/DashboardContext";
 import { OverviewSection } from "@/components/dashboard/OverviewSection";
@@ -20,9 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 const navGroups = [
   {
     label: "Analytics",
-    items: [
-      { id: "overview", label: "Overview", icon: LayoutDashboard },
-    ],
+    items: [{ id: "overview", label: "Overview", icon: LayoutDashboard }],
   },
   {
     label: "Storefront",
@@ -34,21 +33,20 @@ const navGroups = [
   },
   {
     label: "Deploy",
-    items: [
-      { id: "publish", label: "Publish & Verify", icon: Rocket },
-    ],
+    items: [{ id: "publish", label: "Publish & Verify", icon: Rocket }],
   },
 ];
 
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab } = useDashboard();
+  const { activeTab, setActiveTab, loading } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggle } = useTheme();
+  const { user, signOut } = useAuth();
   const storeUrl = localStorage.getItem("mime_store_url") || "https://example-store.com";
   const storeId = localStorage.getItem("mime_store_id") || "store_demo123";
   const storeName = new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname;
@@ -56,9 +54,25 @@ function DashboardInner() {
   const handleRescan = () => {
     toast({ title: "Re-scanning...", description: "This will take a few seconds." });
     setTimeout(() => {
-      toast({ title: "Scan complete", description: "58 products indexed." });
+      toast({ title: "Scan complete", description: "Products re-indexed." });
     }, 3000);
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -76,29 +90,18 @@ function DashboardInner() {
         <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 px-3 mb-1.5">
-                {group.label}
-              </div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 px-3 mb-1.5">{group.label}</div>
               <div className="space-y-0.5">
                 {group.items.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setActiveTab(t.id)}
+                  <button key={t.id} onClick={() => setActiveTab(t.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium relative transition-colors ${
-                      activeTab === t.id
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    }`}
-                  >
+                      activeTab === t.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}>
                     {activeTab === t.id && (
-                      <motion.div
-                        layoutId="activeTab"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary"
-                        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                      />
+                      <motion.div layoutId="activeTab" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary"
+                        transition={{ type: "spring", stiffness: 300, damping: 25 }} />
                     )}
-                    <t.icon className="h-4 w-4" />
-                    {t.label}
+                    <t.icon className="h-4 w-4" />{t.label}
                   </button>
                 ))}
               </div>
@@ -113,31 +116,33 @@ function DashboardInner() {
           <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
             <HelpCircle className="h-4 w-4" /> Help
           </button>
+          <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-muted/50 transition-colors">
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
         </div>
 
+        {/* User info */}
         <div className="p-4 border-t border-border/50">
-          <div className="text-[10px] text-muted-foreground/40">v1.0 beta</div>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+              <User className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium truncate">{user?.email}</div>
+              <div className="text-[10px] text-muted-foreground/40">v1.0 beta</div>
+            </div>
+          </div>
         </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
         <header className="h-14 border-b border-border/50 bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-3">
-            <select
-              className="md:hidden bg-transparent text-sm font-medium border rounded px-2 py-1"
-              value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value)}
-            >
-              {allTabs.map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
+            <select className="md:hidden bg-transparent text-sm font-medium border rounded px-2 py-1" value={activeTab} onChange={(e) => setActiveTab(e.target.value)}>
+              {allTabs.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="hidden md:flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-1.5 hover:bg-muted/50 transition-colors cursor-pointer"
-            >
+            <button onClick={() => setSearchOpen(true)} className="hidden md:flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-1.5 hover:bg-muted/50 transition-colors cursor-pointer">
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-sm text-muted-foreground/50 w-52 text-left">Search products, rules... ⌘K</span>
             </button>
@@ -147,9 +152,7 @@ function DashboardInner() {
             <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
               status === "draft" ? "border-border/50 text-muted-foreground" :
               status === "published" ? "border-emerald-500/30 text-emerald-400" : "border-blue-500/30 text-blue-400"
-            }`}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </span>
+            }`}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={toggle}>
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -162,16 +165,9 @@ function DashboardInner() {
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
               {activeTab === "overview" && <OverviewSection />}
               {activeTab === "products" && <ProductsSection />}
               {activeTab === "rules" && <RulesSection />}

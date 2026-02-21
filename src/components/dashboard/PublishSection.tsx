@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, CheckCircle2, XCircle, Rocket } from "lucide-react";
+import { Copy, CheckCircle2, XCircle, Rocket, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { useDashboard } from "@/context/DashboardContext";
+import { supabase } from "@/integrations/supabase/client";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 
 interface Props {
@@ -11,10 +14,13 @@ interface Props {
 
 export function PublishSection({ storeId }: Props) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { products, rules, saveProducts, saveRules } = useDashboard();
   const [domain, setDomain] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const endpoint = `https://mime.ai/storefront/${storeId}/agent.json`;
@@ -33,18 +39,51 @@ export function PublishSection({ storeId }: Props) {
     }, 2000);
   };
 
-  const handlePublish = () => {
+  const handleSaveAll = async () => {
+    setSaving(true);
+    await saveProducts();
+    await saveRules();
+    setSaving(false);
+  };
+
+  const handlePublish = async () => {
     setConfirmOpen(false);
     setPublishing(true);
+
+    // Save to DB first
+    await saveProducts();
+    await saveRules();
+
+    // Record publish in history
+    if (user) {
+      const snapshot = {
+        products: products.filter((p) => p.included).map((p) => ({
+          id: p.id, title: p.title, boostScore: p.boostScore, tags: p.tags,
+        })),
+        rules: rules.map((r) => ({ name: r.name, action: r.action })),
+        published_at: new Date().toISOString(),
+      };
+      await supabase.from("publish_history").insert({
+        user_id: user.id,
+        snapshot,
+      });
+    }
+
     setTimeout(() => {
       setPublishing(false);
       toast({ title: "Published!", description: "Your storefront changes are live." });
-    }, 2000);
+    }, 1500);
   };
 
   return (
     <div className="space-y-6 max-w-2xl">
       <h2 className="font-heading text-2xl font-bold">Publish & Verify</h2>
+
+      {/* Save button */}
+      <Button variant="outline" className="w-full h-10" onClick={handleSaveAll} disabled={saving}>
+        <Save className="h-4 w-4 mr-2" />
+        {saving ? "Saving..." : "Save all changes to database"}
+      </Button>
 
       {/* Endpoints */}
       <div className="card-elevated p-5 space-y-4">
@@ -72,15 +111,10 @@ export function PublishSection({ storeId }: Props) {
       {/* Verify */}
       <div className="card-elevated p-5 space-y-4">
         <h3 className="text-sm font-semibold">Verify installation</h3>
-        <Input
-          placeholder="Your domain (optional)"
-          value={domain}
-          onChange={(e) => setDomain(e.target.value)}
-        />
+        <Input placeholder="Your domain (optional)" value={domain} onChange={(e) => setDomain(e.target.value)} />
         <Button onClick={handleVerify} variant="outline" className="w-full" disabled={verifying}>
           {verifying ? "Verifying..." : "Verify"}
         </Button>
-
         {verified === true && (
           <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
             <CheckCircle2 className="h-4 w-4" /> Installation verified — agents can discover your store.

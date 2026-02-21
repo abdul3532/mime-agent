@@ -5,6 +5,7 @@ import { getCategories, Product } from "@/data/mockProducts";
 import {
   Package, Layers, SlidersHorizontal, TrendingUp, TrendingDown,
   ArrowUpRight, Lightbulb, AlertTriangle, Star, BarChart3, Check,
+  Eye, MousePointerClick, Search, Zap,
 } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import {
@@ -54,21 +55,22 @@ function KpiCard({ label, value, suffix, trend, icon: Icon, index, onClick }: {
   );
 }
 
+// Agent-specific weekly data
 const weeklyData = [
-  { name: "Mon", queries: 42, conversions: 12 },
-  { name: "Tue", queries: 58, conversions: 18 },
-  { name: "Wed", queries: 65, conversions: 22 },
-  { name: "Thu", queries: 51, conversions: 15 },
-  { name: "Fri", queries: 78, conversions: 28 },
-  { name: "Sat", queries: 90, conversions: 35 },
-  { name: "Sun", queries: 72, conversions: 25 },
+  { name: "Mon", queries: 42, impressions: 128, clicks: 18 },
+  { name: "Tue", queries: 58, impressions: 190, clicks: 32 },
+  { name: "Wed", queries: 65, impressions: 215, clicks: 28 },
+  { name: "Thu", queries: 51, impressions: 168, clicks: 22 },
+  { name: "Fri", queries: 78, impressions: 264, clicks: 41 },
+  { name: "Sat", queries: 90, impressions: 312, clicks: 52 },
+  { name: "Sun", queries: 72, impressions: 248, clicks: 38 },
 ];
 
 const suggestions = [
   { icon: Lightbulb, title: "Boost low-stock items", desc: "5 products with < 15 units could benefit from urgency signals.", type: "tip" as const, apply: (products: Product[]) => products.map((p) => p.inventory < 15 && p.inventory > 0 ? { ...p, boostScore: Math.min(p.boostScore + 2, 10) } : p), summary: "Boosted 5 low-stock products by +2" },
-  { icon: AlertTriangle, title: "2 products out of stock", desc: "Retinol Night Cream and E-Reader are hidden from agents.", type: "warning" as const, apply: (products: Product[]) => products.map((p) => p.availability === "out_of_stock" ? { ...p, included: false } : p), summary: "Excluded out-of-stock products" },
-  { icon: Star, title: "Top margin opportunity", desc: "Face Mask Sheet Pack has 80% margin but low boost score.", type: "tip" as const, apply: (products: Product[]) => products.map((p) => p.title === "Face Mask Sheet Pack" ? { ...p, boostScore: 8 } : p), summary: "Boosted Face Mask Sheet Pack to 8" },
-  { icon: BarChart3, title: "Category gap", desc: "Food & Drink has the most products but lowest avg boost.", type: "insight" as const, apply: (products: Product[]) => products.map((p) => p.category === "Food & Drink" ? { ...p, boostScore: Math.min(p.boostScore + 1, 10) } : p), summary: "Boosted Food & Drink products by +1" },
+  { icon: AlertTriangle, title: "2 products out of stock", desc: "Exclude them so agents don't surface unavailable items.", type: "warning" as const, apply: (products: Product[]) => products.map((p) => p.availability === "out_of_stock" ? { ...p, included: false } : p), summary: "Excluded out-of-stock products" },
+  { icon: Star, title: "Top coverage opportunity", desc: "Face Mask Sheet Pack has high inventory but low boost score.", type: "tip" as const, apply: (products: Product[]) => products.map((p) => p.title === "Face Mask Sheet Pack" ? { ...p, boostScore: 8 } : p), summary: "Boosted Face Mask Sheet Pack to 8" },
+  { icon: BarChart3, title: "Category gap", desc: "Food & Drink has the most products but lowest avg boost — agents underserve this category.", type: "insight" as const, apply: (products: Product[]) => products.map((p) => p.category === "Food & Drink" ? { ...p, boostScore: Math.min(p.boostScore + 1, 10) } : p), summary: "Boosted Food & Drink products by +1" },
 ];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -98,9 +100,16 @@ export function OverviewSection() {
   const [availDialog, setAvailDialog] = useState<string | null>(null);
 
   const includedProducts = products.filter((p) => p.included);
-  const avgMargin = includedProducts.length ? Math.round(includedProducts.reduce((s, p) => s + p.margin, 0) / includedProducts.length) : 0;
-  const avgBoost = includedProducts.length ? Math.round(includedProducts.reduce((s, p) => s + p.boostScore, 0) / includedProducts.length * 10) / 10 : 0;
-  const categories = getCategories();
+  const totalProducts = products.length;
+  const categories = [...new Set(products.map((p) => p.category))];
+
+  // Agent-specific KPIs
+  const storefrontCoverage = totalProducts > 0 ? Math.round((includedProducts.length / totalProducts) * 100) : 0;
+  const totalQueries = weeklyData.reduce((s, d) => s + d.queries, 0);
+  const totalImpressions = weeklyData.reduce((s, d) => s + d.impressions, 0);
+  const totalClicks = weeklyData.reduce((s, d) => s + d.clicks, 0);
+  const queryMatchRate = totalQueries > 0 ? Math.round((totalImpressions / (totalQueries * products.length) * 100)) : 0;
+  const ctr = totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 1000) / 10 : 0;
 
   const topProducts = [...includedProducts]
     .sort((a, b) => b.boostScore - a.boostScore)
@@ -108,7 +117,8 @@ export function OverviewSection() {
 
   const categoryData = categories.map((cat) => {
     const prods = products.filter((p) => p.category === cat);
-    return { name: cat, products: prods.length, revenue: prods.reduce((s, p) => s + p.price * p.inventory * 0.1, 0) };
+    const included = prods.filter((p) => p.included).length;
+    return { name: cat, products: prods.length, included, coverage: prods.length > 0 ? Math.round((included / prods.length) * 100) : 0 };
   });
 
   const availabilityData = [
@@ -118,10 +128,10 @@ export function OverviewSection() {
   ];
 
   const kpis = [
-    { label: "Products indexed", value: products.length, icon: Package, trend: 12, key: "products" },
-    { label: "Categories", value: categories.length, icon: Layers, trend: 0, key: "categories" },
-    { label: "Avg margin", value: avgMargin, suffix: "%", icon: TrendingUp, trend: 3, key: "margin" },
-    { label: "Avg boost score", value: avgBoost, icon: SlidersHorizontal, trend: -2, key: "boost" },
+    { label: "Agent queries (7d)", value: totalQueries, icon: Search, trend: 18, key: "queries" },
+    { label: "Agent impressions (7d)", value: totalImpressions, icon: Eye, trend: 24, key: "impressions" },
+    { label: "Storefront coverage", value: storefrontCoverage, suffix: "%", icon: Package, trend: 5, key: "coverage" },
+    { label: "Click-through rate", value: ctr, suffix: "%", icon: MousePointerClick, trend: -3, key: "ctr" },
   ];
 
   const handleBarClick = (data: any) => {
@@ -142,12 +152,6 @@ export function OverviewSection() {
     toast({ title: "Applied", description: s.summary });
     setSuggestionConfirm(null);
   };
-
-  const kpiProducts = kpiDialog === "products" ? products
-    : kpiDialog === "categories" ? products
-    : kpiDialog === "margin" ? [...products].sort((a, b) => a.margin - b.margin)
-    : kpiDialog === "boost" ? [...products].sort((a, b) => a.boostScore - b.boostScore)
-    : [];
 
   const availProducts = availDialog ? products.filter((p) => p.availability === availDialog) : [];
 
@@ -170,94 +174,52 @@ export function OverviewSection() {
         <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {kpiDialog === "products" && "Products Indexed"}
-              {kpiDialog === "categories" && "Categories"}
-              {kpiDialog === "margin" && "Margin Distribution"}
-              {kpiDialog === "boost" && "Boost Score Distribution"}
+              {kpiDialog === "queries" && "Agent Queries"}
+              {kpiDialog === "impressions" && "Agent Impressions"}
+              {kpiDialog === "coverage" && "Storefront Coverage"}
+              {kpiDialog === "ctr" && "Click-Through Rate"}
             </DialogTitle>
             <DialogDescription>
-              {kpiDialog === "products" && "Category breakdown with include/exclude toggles."}
-              {kpiDialog === "categories" && "Category details with product counts and margins."}
-              {kpiDialog === "margin" && "Products sorted by margin. Adjust low-margin items."}
-              {kpiDialog === "boost" && "Products sorted by boost score."}
+              {kpiDialog === "queries" && "Total agent queries that hit your storefront this week."}
+              {kpiDialog === "impressions" && "How many times your products were shown to users via AI agents."}
+              {kpiDialog === "coverage" && "Percentage of your catalog that's included and discoverable by agents."}
+              {kpiDialog === "ctr" && "Percentage of impressions that resulted in a click-through."}
             </DialogDescription>
           </DialogHeader>
 
-          {kpiDialog === "products" && (
+          {kpiDialog === "coverage" && (
             <div className="space-y-2">
               {categories.map((cat) => {
                 const catProducts = products.filter((p) => p.category === cat);
-                return (
-                  <div key={cat} className="rounded-lg border border-border/50 p-3 flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium">{cat}</span>
-                      <span className="text-xs text-muted-foreground ml-2">{catProducts.length} products</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{catProducts.filter((p) => p.included).length} included</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {kpiDialog === "categories" && (
-            <div className="space-y-2">
-              {categories.map((cat) => {
-                const catProducts = products.filter((p) => p.category === cat);
-                const catMargin = catProducts.length ? Math.round(catProducts.reduce((s, p) => s + p.margin, 0) / catProducts.length) : 0;
+                const included = catProducts.filter((p) => p.included).length;
+                const pct = catProducts.length > 0 ? Math.round((included / catProducts.length) * 100) : 0;
                 return (
                   <div key={cat} className="rounded-lg border border-border/50 p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{cat}</span>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                        setProducts((prev) => prev.map((p) => p.category === cat ? { ...p, boostScore: Math.min(p.boostScore + 1, 10) } : p));
-                        toast({ title: "Boosted", description: `All ${cat} products boosted by +1` });
-                      }}>Boost all</Button>
+                      <span className="text-xs font-mono">{pct}%</span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">{catProducts.length} products · {catMargin}% avg margin</div>
+                    <div className="text-xs text-muted-foreground mt-1">{included}/{catProducts.length} products included</div>
+                    <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
                   </div>
                 );
               })}
             </div>
           )}
 
-          {kpiDialog === "margin" && (
-            <div className="space-y-2">
-              {kpiProducts.slice(0, 15).map((p) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border/50 p-2.5">
-                  <img src={p.image} alt={p.title} className="w-8 h-8 rounded object-cover" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{p.title}</div>
-                    <div className="text-xs text-muted-foreground">{p.margin}% margin</div>
-                  </div>
-                  {p.margin < 50 && (
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                      updateProduct(p.id, { boostScore: Math.max(p.boostScore - 1, 0) });
-                    }}>Adjust</Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {kpiDialog === "boost" && (
+          {(kpiDialog === "queries" || kpiDialog === "impressions" || kpiDialog === "ctr") && (
             <div className="space-y-3">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-sm font-semibold">Bulk adjust all:</span>
-                <Slider
-                  defaultValue={[5]}
-                  min={0} max={10} step={1}
-                  onValueCommit={([v]) => {
-                    setProducts((prev) => prev.map((p) => ({ ...p, boostScore: v })));
-                    toast({ title: "Bulk adjusted", description: `All products set to boost ${v}` });
-                  }}
-                  className="flex-1"
-                />
-              </div>
-              {kpiProducts.slice(0, 15).map((p) => (
-                <div key={p.id} className="flex items-center gap-3 text-sm">
-                  <span className="truncate flex-1">{p.title}</span>
-                  <span className="font-mono text-xs">{p.boostScore}</span>
+              <div className="text-sm text-muted-foreground">Daily breakdown this week:</div>
+              {weeklyData.map((d) => (
+                <div key={d.name} className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground w-12">{d.name}</span>
+                  <span className="font-mono">
+                    {kpiDialog === "queries" && d.queries}
+                    {kpiDialog === "impressions" && d.impressions}
+                    {kpiDialog === "ctr" && (d.impressions > 0 ? `${Math.round((d.clicks / d.impressions) * 1000) / 10}%` : "0%")}
+                  </span>
                 </div>
               ))}
             </div>
@@ -291,7 +253,7 @@ export function OverviewSection() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="lg:col-span-2 rounded-xl border border-border/50 bg-card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold">Agent Queries & Conversions</h3>
+            <h3 className="text-sm font-semibold">Agent Queries & Impressions</h3>
             <span className="text-xs text-muted-foreground">This week</span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
@@ -301,7 +263,7 @@ export function OverviewSection() {
                   <stop offset="0%" stopColor="hsl(0 0% 80%)" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="hsl(0 0% 80%)" stopOpacity={0} />
                 </linearGradient>
-                <linearGradient id="convGrad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="impGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(0 0% 50%)" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="hsl(0 0% 50%)" stopOpacity={0} />
                 </linearGradient>
@@ -311,14 +273,14 @@ export function OverviewSection() {
               <YAxis tick={{ fontSize: 11, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
               <Area type="monotone" dataKey="queries" name="Queries" stroke="hsl(0 0% 80%)" fill="url(#queryGrad)" strokeWidth={2} />
-              <Area type="monotone" dataKey="conversions" name="Conversions" stroke="hsl(0 0% 50%)" fill="url(#convGrad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="impressions" name="Impressions" stroke="hsl(0 0% 50%)" fill="url(#impGrad)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </motion.div>
 
         {/* Donut — availability */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="rounded-xl border border-border/50 bg-card p-5">
-          <h3 className="text-sm font-semibold mb-2">Availability</h3>
+          <h3 className="text-sm font-semibold mb-2">Product Availability</h3>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie
@@ -351,14 +313,14 @@ export function OverviewSection() {
       {/* Second row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="lg:col-span-2 rounded-xl border border-border/50 bg-card p-5">
-          <h3 className="text-sm font-semibold mb-4">Revenue by Category</h3>
+          <h3 className="text-sm font-semibold mb-4">Agent Coverage by Category</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={categoryData} onClick={(e) => e?.activePayload?.[0]?.payload && handleBarClick(e.activePayload[0].payload)}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 15%)" />
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 10, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="revenue" name="Est. Revenue" radius={[4, 4, 0, 0]} fill="hsl(0 0% 75%)" className="cursor-pointer" />
+              <Bar dataKey="coverage" name="Coverage %" radius={[4, 4, 0, 0]} fill="hsl(0 0% 75%)" className="cursor-pointer" />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
@@ -383,7 +345,6 @@ export function OverviewSection() {
 
       {/* Category Sheet */}
       <CategorySheetPanel category={selectedCategory} open={categorySheetOpen} onOpenChange={setCategorySheetOpen} />
-
       {/* Product Detail Dialog */}
       <ProductDetailDialog product={selectedProduct} open={productDialogOpen} onOpenChange={setProductDialogOpen} />
 
