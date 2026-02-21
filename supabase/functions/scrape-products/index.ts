@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         url: formattedUrl,
         search: "product",
-        limit: 50,
+        limit: 200,
         includeSubdomains: false,
       }),
     });
@@ -92,8 +92,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const productUrls = (mapData.links || []).slice(0, 10);
-    console.log(`Found ${productUrls.length} product URLs`);
+    // Filter to likely product pages and take up to 30
+    const allLinks: string[] = mapData.links || [];
+    const productUrls = allLinks
+      .filter((u: string) => /\/(product|item|shop|collecti|p\/)/i.test(u) || allLinks.length <= 30)
+      .slice(0, 30);
+    console.log(`Found ${allLinks.length} URLs, selected ${productUrls.length} product URLs`);
 
     if (productUrls.length === 0) {
       return new Response(
@@ -123,7 +127,7 @@ Deno.serve(async (req) => {
         const scrapeData = await scrapeRes.json();
         const markdown = scrapeData?.data?.markdown || scrapeData?.markdown;
         if (scrapeRes.ok && markdown) {
-          return { url: pUrl, markdown: markdown.substring(0, 3000) };
+          return { url: pUrl, markdown: markdown.substring(0, 5000) };
         }
       } catch (e) {
         console.error(`Failed to scrape ${pUrl}:`, e);
@@ -170,18 +174,28 @@ Deno.serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `You are a product data extractor. Given markdown content from product pages, extract structured product data. Return ONLY a JSON array of products. Each product object must have these fields:
-- title (string, required)
-- price (number, 0 if not found)
-- currency (string, default "EUR")  
-- category (string, infer from content)
+                content: `You are a product data extractor. Given markdown content from product pages, extract structured product data.
+
+PRICE RULES (CRITICAL):
+- Parse prices carefully. Prices may use comma as decimal separator (e.g. "14,95" = 14.95) or dot (e.g. "14.95" = 14.95).
+- If both comma and dot appear, the LAST separator is the decimal (e.g. "1.234,56" = 1234.56, "1,234.56" = 1234.56).
+- Return price as a decimal number (e.g. 14.95, not 1495).
+- Look for the actual selling price, not crossed-out/original prices.
+- currency: detect from symbols (€=EUR, $=USD, £=GBP) or text. Default "EUR".
+
+Each product object must have:
+- title (string, the product name)
+- price (number, the selling price as a decimal e.g. 14.95)
+- currency (string, e.g. "EUR", "USD")
+- category (string, infer from breadcrumbs or content)
 - availability (string: "in_stock", "out_of_stock", or "preorder")
-- image (string URL or null)
-- tags (string array)
+- image (string, absolute URL of the main product image, or null)
+- tags (string array, relevant keywords)
 - inventory (number, estimate 100 if not specified)
 - url (string, the page URL)
 
-Skip non-product pages (navigation, category listings, etc). Only include actual individual products. Return [] if no products found.`,
+Extract ALL products found on each page. If a page lists multiple products (e.g. collection page), extract each one individually.
+Skip non-product pages (about, contact, FAQ, etc). Return [] if no products found.`,
               },
               {
                 role: "user",
