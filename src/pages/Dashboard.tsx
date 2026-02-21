@@ -169,8 +169,8 @@ function DashboardInner() {
               <User className="h-3.5 w-3.5 text-primary" />
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-medium truncate">{user?.email}</div>
-              <div className="text-[10px] text-muted-foreground/40">v1.0 beta</div>
+              <div className="text-xs font-medium truncate">{user?.email || "Demo user"}</div>
+              <div className="text-[10px] text-muted-foreground/40">{user ? "v1.0 beta" : "Sign in to save"}</div>
             </div>
           </div>
         </div>
@@ -207,6 +207,12 @@ function DashboardInner() {
           </div>
         </header>
 
+        {!user && (
+          <div className="mx-4 md:mx-6 mt-4 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Demo mode — <button onClick={() => navigate("/auth")} className="underline font-medium hover:text-primary/80">Sign in</button> to save your data
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <AnimatePresence mode="wait">
             <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>

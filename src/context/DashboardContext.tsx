@@ -53,9 +53,16 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [lastScannedAt, setLastScannedAt] = useState<Date | null>(null);
   const [seeding, setSeeding] = useState(false);
 
-  // Load products from DB
+  // Load products from DB or demo mode
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      // Demo mode: load mock products into local state
+      import("@/data/mockProducts").then(({ mockProducts }) => {
+        setProducts(mockProducts);
+        setLoading(false);
+      });
+      return;
+    }
     const loadData = async () => {
       setLoading(true);
       const { data: dbProducts } = await supabase
@@ -80,7 +87,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           boostScore: p.boost_score,
           included: p.included,
         })));
-        // Set last scanned from most recent product's created_at
         if (dbProducts.length > 0) {
           const latest = dbProducts.reduce((a, b) => a.created_at > b.created_at ? a : b);
           setLastScannedAt(new Date(latest.created_at));
@@ -139,7 +145,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const saveProducts = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      toast({ title: "Demo mode", description: "Sign in to save your data." });
+      return;
+    }
     for (const p of products) {
       await supabase.from("products").update({
         boost_score: p.boostScore,
@@ -151,7 +160,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [user, products, toast]);
 
   const saveRules = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      toast({ title: "Demo mode", description: "Sign in to save your data." });
+      return;
+    }
     await supabase.from("rules").delete().eq("user_id", user.id);
     const inserts = rules.map((r) => ({
       user_id: user.id,
@@ -169,27 +181,32 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [user, rules, toast]);
 
   const seedDemoProducts = useCallback(async () => {
-    if (!user) return;
     setSeeding(true);
     try {
       const { mockProducts } = await import("@/data/mockProducts");
-      const inserts = mockProducts.map((p) => ({
-        user_id: user.id,
-        title: p.title,
-        price: p.price,
-        currency: p.currency,
-        availability: p.availability,
-        category: p.category,
-        tags: p.tags,
-        inventory: p.inventory,
-        url: p.url,
-        image: p.image,
-        boost_score: p.boostScore,
-        included: p.included,
-      }));
-      await supabase.from("products").insert(inserts);
-      await reloadProducts();
-      toast({ title: "Demo loaded", description: "Sample products added to your dashboard." });
+      if (!user) {
+        // Demo mode: just set local state
+        setProducts(mockProducts);
+        toast({ title: "Demo loaded", description: "Sample products loaded locally." });
+      } else {
+        const inserts = mockProducts.map((p) => ({
+          user_id: user.id,
+          title: p.title,
+          price: p.price,
+          currency: p.currency,
+          availability: p.availability,
+          category: p.category,
+          tags: p.tags,
+          inventory: p.inventory,
+          url: p.url,
+          image: p.image,
+          boost_score: p.boostScore,
+          included: p.included,
+        }));
+        await supabase.from("products").insert(inserts);
+        await reloadProducts();
+        toast({ title: "Demo loaded", description: "Sample products added to your dashboard." });
+      }
     } catch (e) {
       toast({ title: "Error", description: "Failed to load demo data.", variant: "destructive" });
     } finally {

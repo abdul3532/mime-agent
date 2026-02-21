@@ -93,12 +93,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Filter to likely product pages and take up to 30
+    // Use all discovered URLs (up to 200) - let AI decide what's a product
     const allLinks: string[] = mapData.links || [];
-    const productUrls = allLinks
-      .filter((u: string) => /\/(product|item|shop|collecti|p\/)/i.test(u) || allLinks.length <= 30)
-      .slice(0, 30);
-    console.log(`Found ${allLinks.length} URLs, selected ${productUrls.length} product URLs`);
+    const productUrls = allLinks.slice(0, 200);
+    console.log(`Found ${allLinks.length} URLs, scraping ${productUrls.length} pages`);
 
     if (productUrls.length === 0) {
       return new Response(
