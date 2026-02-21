@@ -45,7 +45,7 @@ const Dashboard = () => {
           <button onClick={() => navigate("/")} className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-all duration-200 mb-4 hover:translate-x-[-2px]">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to home
           </button>
-          <img src={mimeLogo} alt="MIME" className="h-14 -my-3" />
+          <img src={mimeLogo} alt="MIME" className="h-14 -my-3 brightness-0 invert" />
           <p className="text-xs text-muted-foreground mt-1">Storefront Manager</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">

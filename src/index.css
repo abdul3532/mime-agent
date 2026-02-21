@@ -38,6 +38,7 @@
     --hero-gradient-end: 230 40% 14%;
     --glow-primary: 230 70% 58%;
     --glow-yellow: 45 95% 55%;
+    --glow-purple: 270 60% 55%;
     --success: 152 60% 42%;
     --success-foreground: 0 0% 100%;
   }
@@ -71,6 +72,10 @@
 
   .glow-primary {
     box-shadow: 0 0 50px -10px hsl(var(--glow-primary) / 0.4);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 60px -10px hsl(var(--glow-purple) / 0.35);
   }
 
   .card-elevated {

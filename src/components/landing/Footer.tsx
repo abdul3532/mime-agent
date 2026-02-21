@@ -6,7 +6,7 @@ export function Footer() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <img src={mimeLogo} alt="MIME" className="h-16 -my-4" />
+            <img src={mimeLogo} alt="MIME" className="h-16 -my-4 brightness-0 invert" />
             <p className="text-sm text-muted-foreground">
               Building the commerce layer for the agentic economy.
             </p>
