@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
@@ -7,14 +8,16 @@ import { Footer } from "@/components/landing/Footer";
 import { PeekingMime } from "@/components/landing/PeekingMime";
 
 const Index = () => {
+  const mimeTrackRef = useRef<HTMLDivElement>(null);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <main>
         <Hero />
         <HowItWorks />
-        <div className="relative">
-          <PeekingMime />
+        <div ref={mimeTrackRef}>
+          <PeekingMime trackRef={mimeTrackRef} />
           <Comparison />
           <WizardContainer />
         </div>
