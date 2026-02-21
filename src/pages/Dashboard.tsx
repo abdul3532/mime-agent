@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,9 +40,10 @@ const navGroups = [
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab, loading } = useDashboard();
+  const { activeTab, setActiveTab, loading, reloadProducts } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [rescanning, setRescanning] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggle } = useTheme();
@@ -51,12 +52,28 @@ function DashboardInner() {
   const storeId = localStorage.getItem("mime_store_id") || "";
   const storeName = storeUrl ? new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname : "No store connected";
 
-  const handleRescan = () => {
-    toast({ title: "Re-scanning...", description: "This will take a few seconds." });
-    setTimeout(() => {
-      toast({ title: "Scan complete", description: "Products re-indexed." });
-    }, 3000);
-  };
+  const handleRescan = useCallback(async () => {
+    if (!storeUrl) {
+      toast({ title: "No store URL", description: "Connect a store first.", variant: "destructive" });
+      return;
+    }
+    setRescanning(true);
+    toast({ title: "Re-scanning...", description: "Scraping products from your store." });
+    try {
+      const { scrapeProducts } = await import("@/lib/api/scrapeProducts");
+      const result = await scrapeProducts(storeUrl);
+      if (result.success) {
+        await reloadProducts();
+        toast({ title: "Scan complete", description: `Found ${result.products_found} products in ${result.categories.length} categories.` });
+      } else {
+        toast({ title: "Scan failed", description: result.error || "Unknown error", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Scan failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setRescanning(false);
+    }
+  }, [storeUrl, reloadProducts, toast]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -159,8 +176,8 @@ function DashboardInner() {
             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground">
               <Bell className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="outline" onClick={handleRescan} className="group h-8">
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5 transition-transform group-hover:rotate-180 duration-500" /> Re-scan
+            <Button size="sm" variant="outline" onClick={handleRescan} disabled={rescanning} className="group h-8">
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 transition-transform ${rescanning ? "animate-spin" : "group-hover:rotate-180"} duration-500`} /> {rescanning ? "Scanning..." : "Re-scan"}
             </Button>
           </div>
         </header>
