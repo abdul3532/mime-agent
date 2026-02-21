@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Search, CheckCircle2, FileText, Tag, AlertTriangle, XCircle, LogIn } from "lucide-react";
+import { Search, CheckCircle2, FileText, Tag, AlertTriangle, XCircle, LogIn, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { scrapeProducts, pollScrapeProgress, ScrapeResult, ScrapeProgress } from "@/lib/api/scrapeProducts";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   storeUrl: string;
@@ -25,6 +26,8 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
+  const [alreadyScanned, setAlreadyScanned] = useState(false);
+  const [existingCount, setExistingCount] = useState(0);
   const [result, setResult] = useState<ScrapeResult | null>(null);
   const [progress, setProgress] = useState<ScrapeProgress | null>(null);
   const runIdRef = useRef<string>(crypto.randomUUID());
@@ -39,7 +42,22 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       setStage(0);
       setError(null);
       setNeedsAuth(false);
+      setAlreadyScanned(false);
       setProgress(null);
+
+      // Check if user already has products from this URL
+      if (user) {
+        const { count } = await supabase
+          .from("products")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id);
+        
+        if (count && count > 0) {
+          setAlreadyScanned(true);
+          setExistingCount(count);
+          return;
+        }
+      }
 
       const runId = runIdRef.current;
 
@@ -175,7 +193,28 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         ))}
       </div>
 
-      {/* Needs auth state */}
+      {/* Already scanned state */}
+      {alreadyScanned && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+          <div className="flex items-center gap-2 text-accent-foreground font-semibold">
+            <CheckCircle2 className="h-5 w-5 text-accent" />
+            Products already imported
+          </div>
+          <p className="text-sm text-muted-foreground">
+            You already have {existingCount} products in your dashboard. You can rescan from the dashboard if you want to update them.
+          </p>
+          <div className="flex gap-3">
+            <Button onClick={() => navigate("/dashboard")} className="flex-1 gap-2">
+              <RefreshCw className="h-4 w-4" /> Go to dashboard
+            </Button>
+            <Button variant="outline" onClick={onComplete}>
+              Continue setup
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+
       {needsAuth && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           <div className="flex items-center gap-2 text-primary font-semibold">
