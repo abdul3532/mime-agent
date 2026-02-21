@@ -9,6 +9,9 @@ export interface ScrapeResult {
 }
 
 export async function scrapeProducts(url: string): Promise<ScrapeResult> {
+  // Refresh the session token before long-running scrape to prevent expiry
+  await supabase.auth.refreshSession();
+
   const { data, error } = await supabase.functions.invoke("scrape-products", {
     body: { url },
   });
