@@ -29,10 +29,6 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      setNeedsAuth(true);
-      return;
-    }
 
     let cancelled = false;
 
@@ -40,6 +36,21 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       setStage(0);
       setError(null);
       setNeedsAuth(false);
+
+      if (!user) {
+        // Demo mode: simulate scan with timers and mock data
+        const timers = [
+          setTimeout(() => { if (!cancelled) setStage(1); }, 1500),
+          setTimeout(() => { if (!cancelled) setStage(2); }, 3000),
+          setTimeout(() => {
+            if (cancelled) return;
+            setStage(3);
+            setResult({ success: true, products_found: 24, categories: ["Electronics", "Clothing", "Home", "Sports"], pages_scanned: 12 });
+            setTimeout(() => { if (!cancelled) setDone(true); }, 800);
+          }, 4500),
+        ];
+        return () => { timers.forEach(clearTimeout); };
+      }
 
       const stageTimer = setInterval(() => {
         setStage((prev) => (prev < 2 ? prev + 1 : prev));

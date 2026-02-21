@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, Sun, Moon } from "lucide-react";
+import { Menu, X, Sun, Moon, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import mimeLogo from "@/assets/mime-logo.png";
 import { useTheme } from "@/components/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
 
 const navLinks = [
   { label: "Product", href: "#hero" },
@@ -18,6 +19,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -64,9 +66,22 @@ export function Navbar() {
           <button onClick={toggle} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <Button size="sm" onClick={() => handleNav("#wizard")} className="btn-glow">
-            Start demo
-          </Button>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1.5">
+                <User className="h-3 w-3" />
+                <span className="max-w-[120px] truncate">{user.email}</span>
+              </div>
+              <Button size="sm" onClick={() => handleNav("/dashboard")} className="btn-glow">Dashboard</Button>
+              <button onClick={() => signOut()} className="p-2 rounded-lg text-muted-foreground hover:text-destructive transition-colors" title="Sign out">
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={() => handleNav("#wizard")} className="btn-glow">
+              Start demo
+            </Button>
+          )}
         </div>
 
         {/* Mobile toggle */}
