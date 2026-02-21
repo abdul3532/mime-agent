@@ -34,13 +34,13 @@ export function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-card/90 backdrop-blur-lg border-b shadow-sm" : "bg-transparent"
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        scrolled ? "bg-background/80 backdrop-blur-xl border-b border-border/50" : "bg-transparent"
       }`}
     >
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link to="/" className="flex items-center">
-          <img src={mimeLogo} alt="MIME" className="h-24 -my-8" />
+          <img src={mimeLogo} alt="MIME" className="h-36 -my-14" />
         </Link>
 
         {/* Desktop */}
@@ -49,12 +49,13 @@ export function Navbar() {
             <button
               key={l.label}
               onClick={() => handleNav(l.href)}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors relative group"
             >
               {l.label}
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-primary transition-all duration-300 group-hover:w-full" />
             </button>
           ))}
-          <Button size="sm" onClick={() => handleNav("#wizard")}>
+          <Button size="sm" onClick={() => handleNav("#wizard")} className="btn-glow">
             Start demo
           </Button>
         </div>
