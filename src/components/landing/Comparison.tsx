@@ -9,10 +9,10 @@ const beforeItems = [
 ];
 
 const afterItems = [
-  { icon: Zap, label: "Instant structured endpoint", detail: "1 request, <200ms", status: "good" as const },
-  { icon: ShieldCheck, label: "Verified product facts", detail: "Always current, always correct", status: "good" as const },
-  { icon: SlidersHorizontal, label: "Merchant sets priorities", detail: "You control what agents see first", status: "good" as const },
-  { icon: CheckCircle2, label: "Real-time updates", detail: "Changes publish instantly", status: "good" as const },
+  { icon: Zap, label: "Faster discovery", detail: "Less crawling, instant structured data", status: "good" as const },
+  { icon: ShieldCheck, label: "More reliable results", detail: "Structured facts, not scraped guesses", status: "good" as const },
+  { icon: SlidersHorizontal, label: "Merchant-controlled", detail: "You decide what gets pushed", status: "good" as const },
+  { icon: CheckCircle2, label: "Discoverable by design", detail: "Alternate link + well-known endpoints", status: "good" as const },
 ];
 
 export function Comparison() {
@@ -151,7 +151,7 @@ export function Comparison() {
         >
           {[
             { value: "60×", label: "Faster discovery" },
-            { value: "100%", label: "Data accuracy" },
+            { value: "100%", label: "Verifiable" },
             { value: "0", label: "Scraping errors" },
           ].map((s) => (
             <div key={s.label} className="text-center p-4 rounded-xl card-elevated">
