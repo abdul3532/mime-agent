@@ -40,7 +40,7 @@ const navGroups = [
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, lastScannedAt, setLastScannedAt } = useDashboard();
+  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, scanStep, setScanStep, lastScannedAt, setLastScannedAt } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
@@ -68,11 +68,23 @@ function DashboardInner() {
       return;
     }
     setRescanning(true);
+    setScanStep("Discovering product pages...");
     toast({ title: "Re-scanning...", description: "Scraping products from your store." });
     try {
+      // Simulate step progression while edge function runs
+      const stepTimer = setTimeout(() => setScanStep("Scraping product content..."), 5000);
+      const stepTimer2 = setTimeout(() => setScanStep("Extracting product data with AI..."), 15000);
+      const stepTimer3 = setTimeout(() => setScanStep("Saving to database..."), 25000);
+
       const { scrapeProducts } = await import("@/lib/api/scrapeProducts");
       const result = await scrapeProducts(storeUrl);
+
+      clearTimeout(stepTimer);
+      clearTimeout(stepTimer2);
+      clearTimeout(stepTimer3);
+
       if (result.success) {
+        setScanStep("Done!");
         await reloadProducts();
         setLastScannedAt(new Date());
         toast({ title: "Scan complete", description: `Found ${result.products_found} products in ${result.categories.length} categories.` });
@@ -83,6 +95,7 @@ function DashboardInner() {
       toast({ title: "Scan failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
     } finally {
       setRescanning(false);
+      setScanStep("");
     }
   }, [storeUrl, reloadProducts, toast]);
 
