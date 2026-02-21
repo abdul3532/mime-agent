@@ -40,10 +40,9 @@ const navGroups = [
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab, loading, reloadProducts } = useDashboard();
+  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [rescanning, setRescanning] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggle } = useTheme();

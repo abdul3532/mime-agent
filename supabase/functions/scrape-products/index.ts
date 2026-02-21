@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const productUrls = (mapData.links || []).slice(0, 30);
+    const productUrls = (mapData.links || []).slice(0, 10);
     console.log(`Found ${productUrls.length} product URLs`);
 
     if (productUrls.length === 0) {
@@ -102,11 +102,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 2: Scrape product pages
-    console.log("Step 2: Scraping product pages...");
-    const scrapedPages: { url: string; markdown: string }[] = [];
-
-    for (const pUrl of productUrls) {
+    // Step 2: Scrape product pages in parallel
+    console.log("Step 2: Scraping product pages in parallel...");
+    
+    const scrapePromises = productUrls.map(async (pUrl: string) => {
       try {
         const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
           method: "POST",
@@ -124,12 +123,19 @@ Deno.serve(async (req) => {
         const scrapeData = await scrapeRes.json();
         const markdown = scrapeData?.data?.markdown || scrapeData?.markdown;
         if (scrapeRes.ok && markdown) {
-          scrapedPages.push({ url: pUrl, markdown: markdown.substring(0, 4000) });
+          return { url: pUrl, markdown: markdown.substring(0, 3000) };
         }
       } catch (e) {
         console.error(`Failed to scrape ${pUrl}:`, e);
       }
-    }
+      return null;
+    });
+
+    const results = await Promise.allSettled(scrapePromises);
+    const scrapedPages = results
+      .filter((r): r is PromiseFulfilledResult<{ url: string; markdown: string } | null> => r.status === "fulfilled")
+      .map(r => r.value)
+      .filter((v): v is { url: string; markdown: string } => v !== null);
 
     console.log(`Scraped ${scrapedPages.length} pages successfully`);
 

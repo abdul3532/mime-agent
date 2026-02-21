@@ -5,15 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProductDetailDialog } from "./ProductDetailDialog";
 
 const PAGE_SIZE = 10;
 
 export function ProductsSection() {
-  const { products, setProducts, updateProduct } = useDashboard();
+  const { products, setProducts, updateProduct, rescanning } = useDashboard();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [availFilter, setAvailFilter] = useState<string>("all");
@@ -72,6 +73,30 @@ export function ProductsSection() {
     if (a === "low_stock") return "Low stock";
     return "Out of stock";
   };
+
+  if (rescanning) {
+    return (
+      <div className="space-y-4">
+        <h2 className="font-heading text-2xl font-bold">Products</h2>
+        <div className="card-elevated p-8 flex flex-col items-center gap-4">
+          <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+          <div className="text-center">
+            <p className="font-medium">Scanning your store...</p>
+            <p className="text-sm text-muted-foreground mt-1">Discovering and extracting products. This may take 30–60 seconds.</p>
+          </div>
+          <div className="w-full max-w-md space-y-3 mt-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="w-8 h-8 rounded" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
