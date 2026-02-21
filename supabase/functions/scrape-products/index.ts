@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
     }
 
     const allLinks: string[] = mapData.links || [];
-    const productUrls = allLinks.slice(0, 200);
+    const productUrls = allLinks.slice(0, 50);
     console.log(`Found ${allLinks.length} URLs, scraping ${productUrls.length} pages`);
 
     await updateProgress({ status: "scraping", total_urls: productUrls.length });
@@ -217,9 +217,17 @@ Deno.serve(async (req) => {
     console.log("Step 3: Extracting product data with AI...");
     const allProducts: any[] = [];
 
-    const batchSize = 5;
-    for (let i = 0; i < scrapedPages.length; i += batchSize) {
-      const batch = scrapedPages.slice(i, i + batchSize);
+    const aiBatchSize = 10;
+    const aiConcurrency = 3;
+    const aiBatches: { url: string; markdown: string }[][] = [];
+    for (let i = 0; i < scrapedPages.length; i += aiBatchSize) {
+      aiBatches.push(scrapedPages.slice(i, i + aiBatchSize));
+    }
+
+    for (let i = 0; i < aiBatches.length; i += aiConcurrency) {
+      const concurrentBatches = aiBatches.slice(i, i + aiConcurrency);
+      const batchResults = await Promise.allSettled(
+        concurrentBatches.map(async (batch) => {
       const pagesText = batch
         .map((p, idx) => `--- PAGE ${idx + 1} (${p.url}) ---\n${p.markdown}`)
         .join("\n\n");
@@ -305,7 +313,7 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
         if (!aiRes.ok) {
           const errText = await aiRes.text();
           console.error(`AI extraction failed (${aiRes.status}):`, errText.substring(0, 200));
-          continue;
+          return [];
         }
 
         const aiData = await aiRes.json();
@@ -313,13 +321,23 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
         if (toolCall?.function?.arguments) {
           const parsed = JSON.parse(toolCall.function.arguments);
           if (Array.isArray(parsed.products)) {
-            allProducts.push(...parsed.products);
-            await updateProgress({ extracted_products: allProducts.length });
+            return parsed.products;
           }
         }
+        return [];
       } catch (e) {
         console.error("AI extraction error:", e);
+        return [];
       }
+        })
+      );
+
+      for (const r of batchResults) {
+        if (r.status === "fulfilled" && Array.isArray(r.value)) {
+          allProducts.push(...r.value);
+        }
+      }
+      await updateProgress({ extracted_products: allProducts.length });
     }
 
     console.log(`Extracted ${allProducts.length} products`);
