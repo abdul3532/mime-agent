@@ -2,6 +2,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Zap, ShieldCheck, SlidersHorizontal, Globe, CheckCircle2, ArrowRight } from "lucide-react";
+import { StarField } from "./StarField";
 
 const benefits = [
   { icon: Zap, title: "Faster discovery", desc: "Less crawling, instant structured data" },
@@ -23,12 +24,19 @@ export function Hero() {
 
   return (
     <section ref={ref} id="hero" className="relative overflow-hidden pt-32 pb-20 md:pt-44 md:pb-32">
+      {/* Star field */}
+      <StarField />
+
       {/* Ambient background effects */}
-      <div className="absolute inset-0 grid-pattern opacity-30" />
+      <div className="absolute inset-0 grid-pattern opacity-20" />
       <div className="orb w-[700px] h-[700px] bg-primary/8 top-[-300px] right-[-200px]" />
       <div className="orb w-[500px] h-[500px] bg-accent/5 bottom-[-200px] left-[-150px]" style={{ animationDelay: "-7s" }} />
-      {/* Top arc glow like NEONE reference */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] rounded-[50%] pointer-events-none" style={{ background: "radial-gradient(ellipse at center top, hsl(230 70% 58% / 0.12) 0%, transparent 60%)" }} />
+      {/* Purple orb for depth */}
+      <div className="orb w-[600px] h-[600px] top-[-100px] left-[20%]" style={{ background: "hsl(270 60% 55% / 0.06)", animationDelay: "-12s" }} />
+      <div className="orb w-[400px] h-[400px] bottom-[10%] right-[10%]" style={{ background: "hsl(270 60% 55% / 0.04)", animationDelay: "-4s" }} />
+
+      {/* Top arc glow — blue + purple blend */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] rounded-[50%] pointer-events-none" style={{ background: "radial-gradient(ellipse at center top, hsl(230 70% 58% / 0.12) 0%, hsl(270 60% 55% / 0.06) 40%, transparent 70%)" }} />
 
       <motion.div style={{ y, opacity, scale }} className="container mx-auto px-4 relative">
         <motion.div
@@ -41,7 +49,7 @@ export function Hero() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8 border border-primary/20"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8 border border-primary/20 backdrop-blur-sm"
           >
             <span className="w-2 h-2 rounded-full bg-primary pulse-dot" />
             Building the commerce layer for the agentic economy
@@ -55,12 +63,12 @@ export function Hero() {
           >
             MIME makes your store{" "}
             <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent">readable for AI agents</span>
+              <span className="bg-gradient-to-r from-primary via-[hsl(270,60%,65%)] to-accent bg-clip-text text-transparent">readable for AI agents</span>
               <motion.span
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ duration: 0.8, delay: 1 }}
-                className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-primary/60 to-accent/40 rounded-full origin-left"
+                className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-primary/60 via-[hsl(270,60%,55%,0.4)] to-accent/40 rounded-full origin-left"
               />
             </span>
             .
@@ -100,9 +108,9 @@ export function Hero() {
               viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
               whileHover={{ y: -6, transition: { duration: 0.2 } }}
-              className="card-elevated p-5 text-center group"
+              className="card-glass p-5 text-center group"
             >
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:bg-primary group-hover:shadow-lg group-hover:scale-110" style={{ boxShadow: "none" }}>
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3 transition-all duration-300 group-hover:bg-primary group-hover:scale-110" style={{ boxShadow: "none" }}>
                 <b.icon className="h-5 w-5 text-primary transition-colors duration-300 group-hover:text-primary-foreground" />
               </div>
               <h3 className="text-sm font-semibold mb-1">{b.title}</h3>
