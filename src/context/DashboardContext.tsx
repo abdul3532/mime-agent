@@ -27,6 +27,8 @@ interface DashboardContextType {
   loading: boolean;
   rescanning: boolean;
   setRescanning: (v: boolean) => void;
+  lastScannedAt: Date | null;
+  setLastScannedAt: (d: Date | null) => void;
   saveProducts: () => Promise<void>;
   saveRules: () => Promise<void>;
   reloadProducts: () => Promise<void>;
@@ -43,6 +45,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [rescanning, setRescanning] = useState(false);
+  const [lastScannedAt, setLastScannedAt] = useState<Date | null>(null);
 
   // Load products from DB
   useEffect(() => {
@@ -71,6 +74,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           boostScore: p.boost_score,
           included: p.included,
         })));
+        // Set last scanned from most recent product's created_at
+        if (dbProducts.length > 0) {
+          const latest = dbProducts.reduce((a, b) => a.created_at > b.created_at ? a : b);
+          setLastScannedAt(new Date(latest.created_at));
+        }
       }
 
       // Load rules
@@ -154,13 +162,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     toast({ title: "Saved", description: "Rules saved to database." });
   }, [user, rules, toast]);
 
-  return (
+    return (
     <DashboardContext.Provider value={{
       products, setProducts, updateProduct,
       rules, setRules,
       appliedSuggestions, applySuggestion,
       activeTab, setActiveTab,
       loading, rescanning, setRescanning,
+      lastScannedAt, setLastScannedAt,
       saveProducts, saveRules, reloadProducts,
     }}>
       {children}

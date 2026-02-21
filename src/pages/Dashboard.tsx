@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,7 +40,7 @@ const navGroups = [
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning } = useDashboard();
+  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, lastScannedAt, setLastScannedAt } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
@@ -50,6 +50,17 @@ function DashboardInner() {
   const storeUrl = localStorage.getItem("mime_store_url") || "";
   const storeId = localStorage.getItem("mime_store_id") || "";
   const storeName = storeUrl ? new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname : "No store connected";
+
+  const lastScannedLabel = useMemo(() => {
+    if (!lastScannedAt) return null;
+    const diff = Date.now() - lastScannedAt.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return lastScannedAt.toLocaleDateString();
+  }, [lastScannedAt]);
 
   const handleRescan = useCallback(async () => {
     if (!storeUrl) {
@@ -63,6 +74,7 @@ function DashboardInner() {
       const result = await scrapeProducts(storeUrl);
       if (result.success) {
         await reloadProducts();
+        setLastScannedAt(new Date());
         toast({ title: "Scan complete", description: `Found ${result.products_found} products in ${result.categories.length} categories.` });
       } else {
         toast({ title: "Scan failed", description: result.error || "Unknown error", variant: "destructive" });
@@ -165,6 +177,7 @@ function DashboardInner() {
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden md:inline text-xs text-muted-foreground">{storeName}</span>
+            {lastScannedLabel && <span className="hidden md:inline text-[10px] text-muted-foreground/60">· Scanned {lastScannedLabel}</span>}
             <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
               status === "draft" ? "border-border/50 text-muted-foreground" :
               status === "published" ? "border-emerald-500/30 text-emerald-400" : "border-blue-500/30 text-blue-400"
