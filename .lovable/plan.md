@@ -1,91 +1,69 @@
 
+# Make the Demo Work End-to-End
 
-# Full Demo and Dashboard Fix Plan
+## What's Broken
 
-## Problem Summary
+1. **Auth blocks everything** - Dashboard requires login, but sessions aren't persisting in the preview. The ProtectedRoute redirects to /auth every time.
+2. **Scraping limited to 30 products** - The edge function caps at 30 URLs (`slice(0, 30)`), but you want ALL products scraped.
+3. **Wizard Step 3 blocks on auth** - StepCrawl won't run without a logged-in user.
+4. **No visual feedback of logged-in state** - No profile indicator or persistent session awareness on the landing page.
 
-The app has several issues preventing a complete working demo:
+## The Plan
 
-1. **Empty dashboard**: The user has 0 products in the database, so all KPIs show 0, charts are empty, and the products table is blank.
-2. **No demo/seed data path**: New users who haven't scanned a store see a completely empty, uninviting dashboard with no guidance.
-3. **Duplicate key warning**: The `WizardContainer` has an `AnimatePresence` wrapping multiple step divs with potential key collisions.
-4. **Wizard doesn't gate auth early enough**: Step 3 (Crawl) requires auth but the user doesn't know until they reach it.
+### 1. Remove auth gate for the demo flow
 
-## Plan
+Make the wizard work without requiring login. The scraping edge function still needs auth (for DB writes), so we'll handle this by:
 
-### 1. Seed demo products for empty dashboards
+- **Remove the `ProtectedRoute` wrapper** from the dashboard route -- make it publicly accessible
+- **In DashboardContext**, if no user is present, work with local state only (no DB reads/writes) -- the seedDemoProducts function will just load mockProducts into React state without touching the DB
+- **In StepCrawl**, remove the auth gate entirely -- if the user is logged in, scrape and save to DB; if not, simulate a scan using demo data
 
-When the dashboard loads and finds 0 products, show an "empty state" with a prominent option to either:
-- **Load demo data** (insert mock products into the DB for this user so all dashboard features work)
-- **Scan a store** (redirect to wizard or trigger re-scan)
+### 2. Scrape ALL products (remove the 30-page cap)
 
-This uses the existing `mockProducts` data, inserting them into the `products` table with the user's `user_id`.
+Update the `scrape-products` edge function:
+- Increase the URL limit from 30 to **all discovered product URLs** (up to the Firecrawl map limit of 200)
+- Remove the restrictive URL filter that only matches `/product|item|shop|collecti|p\//` -- instead, scrape all discovered URLs and let the AI decide what's a product
+- This ensures small stores get complete coverage
 
-**File**: `src/components/dashboard/OverviewSection.tsx` -- add empty state UI at the top when `products.length === 0`
+### 3. Add logged-in state awareness to landing page
 
-**File**: `src/context/DashboardContext.tsx` -- add a `seedDemoProducts()` function that inserts mockProducts into the DB
+- In the **Navbar**, show the user's email/avatar when logged in, with a "Dashboard" link and "Sign out" option
+- In the **wizard StepCrawl**, show "Signed in as [email]" instead of the auth gate when logged in
 
-### 2. Fix duplicate key warning in WizardContainer
+### 4. Make dashboard work without auth (demo mode)
 
-The `AnimatePresence` in `WizardContainer.tsx` wraps all 4 step divs, but the conditional rendering means multiple `motion.div` elements can share the `key` attribute pattern. Fix by ensuring each step block has a unique, stable key and only the active one is inside the `AnimatePresence`.
+- When no user session exists, the dashboard loads **demo products from mockProducts** directly into state
+- All dashboard features (boost sliders, rules, preview JSON, etc.) work on this local data
+- A subtle banner says "Demo mode -- sign in to save your data"
+- The "Load demo data" button works regardless of auth state
 
-**File**: `src/components/landing/WizardContainer.tsx` -- restructure the step rendering to use unique keys
+## Files to Modify
 
-### 3. Add empty states to Products and Rules sections
-
-When there are 0 products, show a friendly empty state in:
-- **ProductsSection**: "No products yet" with buttons to load demo data or scan a store
-- **RulesSection**: Already has default rule templates, but show guidance when no products exist
-
-**Files**: `src/components/dashboard/ProductsSection.tsx`, `src/components/dashboard/RulesSection.tsx`
-
-### 4. Dashboard "no store connected" guidance
-
-When `storeUrl` is empty in Dashboard, show a banner prompting the user to connect a store or load demo data, instead of silently showing "No store connected" in the header.
-
-**File**: `src/pages/Dashboard.tsx` -- add a top banner when no store URL is set
+- **`src/App.tsx`** -- Remove ProtectedRoute from /dashboard, keep it optional
+- **`src/context/DashboardContext.tsx`** -- Support "demo mode" when no user: load mockProducts into state, skip DB calls
+- **`src/components/landing/steps/StepCrawl.tsx`** -- Remove auth gate; if no user, simulate scan with demo data
+- **`src/pages/Dashboard.tsx`** -- Add "demo mode" banner when not authenticated
+- **`src/components/landing/Navbar.tsx`** -- Show logged-in state (email, dashboard link)
+- **`supabase/functions/scrape-products/index.ts`** -- Remove the 30-product cap, scrape all discovered URLs
 
 ## Technical Details
 
-### seedDemoProducts function (DashboardContext)
+### DashboardContext demo mode
+When `user` is null, instead of returning empty state and waiting:
+- Set `loading = false` immediately
+- Load `mockProducts` into `products` state
+- `seedDemoProducts` just sets state directly (no DB)
+- `saveProducts`/`saveRules` show a toast saying "Sign in to save"
 
-```typescript
-const seedDemoProducts = async () => {
-  if (!user) return;
-  const { mockProducts } = await import("@/data/mockProducts");
-  const inserts = mockProducts.map((p) => ({
-    user_id: user.id,
-    title: p.title,
-    price: p.price,
-    currency: p.currency,
-    availability: p.availability,
-    category: p.category,
-    tags: p.tags,
-    inventory: p.inventory,
-    url: p.url,
-    image: p.image,
-    boost_score: p.boostScore,
-    included: p.included,
-  }));
-  await supabase.from("products").insert(inserts);
-  await reloadProducts();
-  toast({ title: "Demo loaded", description: "Sample products added to your dashboard." });
-};
-```
+### StepCrawl without auth
+When no user is logged in:
+- Run a simulated scan (progress through stages with timers)
+- Load mockProducts as the "result" (show counts from mock data)
+- Skip the actual edge function call
+- User can still proceed to Step 4
 
-### WizardContainer key fix
+### Edge function: remove product cap
+Change `slice(0, 30)` to scrape all URLs (up to 200 from the map). Process in larger AI batches.
 
-Move the `AnimatePresence` to wrap only the active step content, not the entire step list. Each conditional block already has unique keys (`step1`, `step2`, etc.) but the parent divs (step refs) are all rendered simultaneously inside `AnimatePresence`, causing duplicate key issues.
-
-### Empty state component pattern
-
-A reusable empty state block with an illustration (Package icon), title, description, and action buttons (Load demo / Scan store).
-
-### Files to modify
-
-- `src/context/DashboardContext.tsx` -- add `seedDemoProducts` to context
-- `src/components/dashboard/OverviewSection.tsx` -- add empty state when 0 products
-- `src/components/dashboard/ProductsSection.tsx` -- add empty state when 0 products
-- `src/components/landing/WizardContainer.tsx` -- fix duplicate key warning
-- `src/pages/Dashboard.tsx` -- add store connection banner
-
+### Navbar auth state
+Use `useAuth()` to check if user is logged in. Show email chip + "Dashboard" button instead of "Start demo" when authenticated.
