@@ -39,8 +39,12 @@ export function Navbar() {
       }`}
     >
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
-        <Link to="/" className="flex items-center">
-          <img src={mimeLogo} alt="MIME" className="h-36 -my-14 brightness-0 invert" />
+        <Link to="/" className="flex items-center group">
+          <img
+            src={mimeLogo}
+            alt="MIME"
+            className="h-36 -my-14 brightness-0 invert transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_20px_hsl(var(--primary)/0.5)]"
+          />
         </Link>
 
         {/* Desktop */}
