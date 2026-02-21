@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { mockProducts, Product, getCategories } from "@/data/mockProducts";
+import { Product, getCategories } from "@/data/mockProducts";
+import { useDashboard } from "@/context/DashboardContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,16 +8,19 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ProductDetailDialog } from "./ProductDetailDialog";
 
 const PAGE_SIZE = 10;
 
 export function ProductsSection() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const { products, setProducts, updateProduct } = useDashboard();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [availFilter, setAvailFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const { toast } = useToast();
   const categories = getCategories();
 
@@ -61,10 +65,6 @@ export function ProductsSection() {
     );
     toast({ title: "Updated", description: `${selected.size} products updated.` });
     setSelected(new Set());
-  };
-
-  const updateBoost = (id: string, val: number) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, boostScore: val } : p)));
   };
 
   const availLabel = (a: string) => {
@@ -131,8 +131,12 @@ export function ProductsSection() {
           </thead>
           <tbody>
             {pageProducts.map((p) => (
-              <tr key={p.id} className={`border-b hover:bg-muted/30 transition-colors ${!p.included ? "opacity-40" : ""}`}>
-                <td className="p-3">
+              <tr
+                key={p.id}
+                className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${!p.included ? "opacity-40" : ""}`}
+                onClick={() => { setSelectedProduct(p); setDetailOpen(true); }}
+              >
+                <td className="p-3" onClick={(e) => e.stopPropagation()}>
                   <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleSelect(p.id)} />
                 </td>
                 <td className="p-3">
@@ -154,11 +158,11 @@ export function ProductsSection() {
                 <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.category}</td>
                 <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.margin}%</td>
                 <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.inventory}</td>
-                <td className="p-3">
+                <td className="p-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-2">
                     <Slider
                       value={[p.boostScore]}
-                      onValueChange={([v]) => updateBoost(p.id, v)}
+                      onValueChange={([v]) => updateProduct(p.id, { boostScore: v })}
                       min={0} max={10} step={1}
                       className="w-20"
                     />
@@ -184,6 +188,8 @@ export function ProductsSection() {
           </Button>
         </div>
       </div>
+
+      <ProductDetailDialog product={selectedProduct} open={detailOpen} onOpenChange={setDetailOpen} />
     </div>
   );
 }

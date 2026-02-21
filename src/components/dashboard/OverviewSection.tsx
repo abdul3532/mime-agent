@@ -1,18 +1,29 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { mockProducts, getCategories } from "@/data/mockProducts";
+import { useDashboard } from "@/context/DashboardContext";
+import { getCategories, Product } from "@/data/mockProducts";
 import {
   Package, Layers, SlidersHorizontal, TrendingUp, TrendingDown,
-  ArrowUpRight, Lightbulb, AlertTriangle, Star, BarChart3,
+  ArrowUpRight, Lightbulb, AlertTriangle, Star, BarChart3, Check,
 } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { ProductDetailDialog } from "./ProductDetailDialog";
+import { CategorySheetPanel } from "./CategorySheetPanel";
 
 // --- KPI Card ---
-function KpiCard({ label, value, suffix, trend, icon: Icon, index }: {
-  label: string; value: number; suffix?: string; trend?: number; icon: React.ElementType; index: number;
+function KpiCard({ label, value, suffix, trend, icon: Icon, index, onClick }: {
+  label: string; value: number; suffix?: string; trend?: number; icon: React.ElementType; index: number; onClick?: () => void;
 }) {
   const { count, ref } = useCountUp(value, 1200);
   return (
@@ -21,7 +32,8 @@ function KpiCard({ label, value, suffix, trend, icon: Icon, index }: {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08 }}
-      className="rounded-xl border border-border/50 bg-card p-5 hover:border-border transition-colors"
+      onClick={onClick}
+      className="rounded-xl border border-border/50 bg-card p-5 hover:border-border transition-colors cursor-pointer"
     >
       <div className="flex items-start justify-between">
         <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -42,7 +54,6 @@ function KpiCard({ label, value, suffix, trend, icon: Icon, index }: {
   );
 }
 
-// --- Mock chart data ---
 const weeklyData = [
   { name: "Mon", queries: 42, conversions: 12 },
   { name: "Tue", queries: 58, conversions: 18 },
@@ -53,23 +64,11 @@ const weeklyData = [
   { name: "Sun", queries: 72, conversions: 25 },
 ];
 
-const categoryData = getCategories().map((cat) => {
-  const products = mockProducts.filter((p) => p.category === cat);
-  return { name: cat, products: products.length, revenue: products.reduce((s, p) => s + p.price * p.inventory * 0.1, 0) };
-});
-
-const availabilityData = [
-  { name: "In Stock", value: mockProducts.filter((p) => p.availability === "in_stock").length, fill: "hsl(0 0% 85%)" },
-  { name: "Low Stock", value: mockProducts.filter((p) => p.availability === "low_stock").length, fill: "hsl(0 0% 55%)" },
-  { name: "Out of Stock", value: mockProducts.filter((p) => p.availability === "out_of_stock").length, fill: "hsl(0 0% 30%)" },
-];
-
-// --- Suggestions ---
 const suggestions = [
-  { icon: Lightbulb, title: "Boost low-stock items", desc: "5 products with < 15 units could benefit from urgency signals.", type: "tip" as const },
-  { icon: AlertTriangle, title: "2 products out of stock", desc: "Retinol Night Cream and E-Reader are hidden from agents.", type: "warning" as const },
-  { icon: Star, title: "Top margin opportunity", desc: "Face Mask Sheet Pack has 80% margin but low boost score.", type: "tip" as const },
-  { icon: BarChart3, title: "Category gap", desc: "Food & Drink has the most products but lowest avg boost.", type: "insight" as const },
+  { icon: Lightbulb, title: "Boost low-stock items", desc: "5 products with < 15 units could benefit from urgency signals.", type: "tip" as const, apply: (products: Product[]) => products.map((p) => p.inventory < 15 && p.inventory > 0 ? { ...p, boostScore: Math.min(p.boostScore + 2, 10) } : p), summary: "Boosted 5 low-stock products by +2" },
+  { icon: AlertTriangle, title: "2 products out of stock", desc: "Retinol Night Cream and E-Reader are hidden from agents.", type: "warning" as const, apply: (products: Product[]) => products.map((p) => p.availability === "out_of_stock" ? { ...p, included: false } : p), summary: "Excluded out-of-stock products" },
+  { icon: Star, title: "Top margin opportunity", desc: "Face Mask Sheet Pack has 80% margin but low boost score.", type: "tip" as const, apply: (products: Product[]) => products.map((p) => p.title === "Face Mask Sheet Pack" ? { ...p, boostScore: 8 } : p), summary: "Boosted Face Mask Sheet Pack to 8" },
+  { icon: BarChart3, title: "Category gap", desc: "Food & Drink has the most products but lowest avg boost.", type: "insight" as const, apply: (products: Product[]) => products.map((p) => p.category === "Food & Drink" ? { ...p, boostScore: Math.min(p.boostScore + 1, 10) } : p), summary: "Boosted Food & Drink products by +1" },
 ];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -87,20 +86,70 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function OverviewSection() {
-  const includedProducts = mockProducts.filter((p) => p.included);
-  const avgMargin = Math.round(includedProducts.reduce((s, p) => s + p.margin, 0) / includedProducts.length);
-  const avgBoost = Math.round(includedProducts.reduce((s, p) => s + p.boostScore, 0) / includedProducts.length * 10) / 10;
+  const { products, setProducts, appliedSuggestions, applySuggestion, updateProduct } = useDashboard();
+  const { toast } = useToast();
+
+  const [kpiDialog, setKpiDialog] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [suggestionConfirm, setSuggestionConfirm] = useState<number | null>(null);
+  const [availDialog, setAvailDialog] = useState<string | null>(null);
+
+  const includedProducts = products.filter((p) => p.included);
+  const avgMargin = includedProducts.length ? Math.round(includedProducts.reduce((s, p) => s + p.margin, 0) / includedProducts.length) : 0;
+  const avgBoost = includedProducts.length ? Math.round(includedProducts.reduce((s, p) => s + p.boostScore, 0) / includedProducts.length * 10) / 10 : 0;
+  const categories = getCategories();
 
   const topProducts = [...includedProducts]
     .sort((a, b) => b.boostScore - a.boostScore)
     .slice(0, 5);
 
-  const kpis = [
-    { label: "Products indexed", value: mockProducts.length, icon: Package, trend: 12 },
-    { label: "Categories", value: 6, icon: Layers, trend: 0 },
-    { label: "Avg margin", value: avgMargin, suffix: "%", icon: TrendingUp, trend: 3 },
-    { label: "Avg boost score", value: avgBoost, icon: SlidersHorizontal, trend: -2 },
+  const categoryData = categories.map((cat) => {
+    const prods = products.filter((p) => p.category === cat);
+    return { name: cat, products: prods.length, revenue: prods.reduce((s, p) => s + p.price * p.inventory * 0.1, 0) };
+  });
+
+  const availabilityData = [
+    { name: "In Stock", key: "in_stock", value: products.filter((p) => p.availability === "in_stock").length, fill: "hsl(0 0% 85%)" },
+    { name: "Low Stock", key: "low_stock", value: products.filter((p) => p.availability === "low_stock").length, fill: "hsl(0 0% 55%)" },
+    { name: "Out of Stock", key: "out_of_stock", value: products.filter((p) => p.availability === "out_of_stock").length, fill: "hsl(0 0% 30%)" },
   ];
+
+  const kpis = [
+    { label: "Products indexed", value: products.length, icon: Package, trend: 12, key: "products" },
+    { label: "Categories", value: categories.length, icon: Layers, trend: 0, key: "categories" },
+    { label: "Avg margin", value: avgMargin, suffix: "%", icon: TrendingUp, trend: 3, key: "margin" },
+    { label: "Avg boost score", value: avgBoost, icon: SlidersHorizontal, trend: -2, key: "boost" },
+  ];
+
+  const handleBarClick = (data: any) => {
+    if (data?.name) {
+      setSelectedCategory(data.name);
+      setCategorySheetOpen(true);
+    }
+  };
+
+  const handlePieClick = (_: any, index: number) => {
+    setAvailDialog(availabilityData[index]?.key || null);
+  };
+
+  const handleApplySuggestion = (idx: number) => {
+    const s = suggestions[idx];
+    setProducts(s.apply(products));
+    applySuggestion(idx);
+    toast({ title: "Applied", description: s.summary });
+    setSuggestionConfirm(null);
+  };
+
+  const kpiProducts = kpiDialog === "products" ? products
+    : kpiDialog === "categories" ? products
+    : kpiDialog === "margin" ? [...products].sort((a, b) => a.margin - b.margin)
+    : kpiDialog === "boost" ? [...products].sort((a, b) => a.boostScore - b.boostScore)
+    : [];
+
+  const availProducts = availDialog ? products.filter((p) => p.availability === availDialog) : [];
 
   return (
     <div className="space-y-6">
@@ -112,19 +161,135 @@ export function OverviewSection() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((k, i) => (
-          <KpiCard key={k.label} {...k} index={i} />
+          <KpiCard key={k.label} {...k} index={i} onClick={() => setKpiDialog(k.key)} />
         ))}
       </div>
 
+      {/* KPI Detail Dialog */}
+      <Dialog open={!!kpiDialog} onOpenChange={(o) => !o && setKpiDialog(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {kpiDialog === "products" && "Products Indexed"}
+              {kpiDialog === "categories" && "Categories"}
+              {kpiDialog === "margin" && "Margin Distribution"}
+              {kpiDialog === "boost" && "Boost Score Distribution"}
+            </DialogTitle>
+            <DialogDescription>
+              {kpiDialog === "products" && "Category breakdown with include/exclude toggles."}
+              {kpiDialog === "categories" && "Category details with product counts and margins."}
+              {kpiDialog === "margin" && "Products sorted by margin. Adjust low-margin items."}
+              {kpiDialog === "boost" && "Products sorted by boost score."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {kpiDialog === "products" && (
+            <div className="space-y-2">
+              {categories.map((cat) => {
+                const catProducts = products.filter((p) => p.category === cat);
+                return (
+                  <div key={cat} className="rounded-lg border border-border/50 p-3 flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium">{cat}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{catProducts.length} products</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{catProducts.filter((p) => p.included).length} included</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {kpiDialog === "categories" && (
+            <div className="space-y-2">
+              {categories.map((cat) => {
+                const catProducts = products.filter((p) => p.category === cat);
+                const catMargin = catProducts.length ? Math.round(catProducts.reduce((s, p) => s + p.margin, 0) / catProducts.length) : 0;
+                return (
+                  <div key={cat} className="rounded-lg border border-border/50 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{cat}</span>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                        setProducts((prev) => prev.map((p) => p.category === cat ? { ...p, boostScore: Math.min(p.boostScore + 1, 10) } : p));
+                        toast({ title: "Boosted", description: `All ${cat} products boosted by +1` });
+                      }}>Boost all</Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">{catProducts.length} products · {catMargin}% avg margin</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {kpiDialog === "margin" && (
+            <div className="space-y-2">
+              {kpiProducts.slice(0, 15).map((p) => (
+                <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border/50 p-2.5">
+                  <img src={p.image} alt={p.title} className="w-8 h-8 rounded object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{p.title}</div>
+                    <div className="text-xs text-muted-foreground">{p.margin}% margin</div>
+                  </div>
+                  {p.margin < 50 && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                      updateProduct(p.id, { boostScore: Math.max(p.boostScore - 1, 0) });
+                    }}>Adjust</Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {kpiDialog === "boost" && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-sm font-semibold">Bulk adjust all:</span>
+                <Slider
+                  defaultValue={[5]}
+                  min={0} max={10} step={1}
+                  onValueCommit={([v]) => {
+                    setProducts((prev) => prev.map((p) => ({ ...p, boostScore: v })));
+                    toast({ title: "Bulk adjusted", description: `All products set to boost ${v}` });
+                  }}
+                  className="flex-1"
+                />
+              </div>
+              {kpiProducts.slice(0, 15).map((p) => (
+                <div key={p.id} className="flex items-center gap-3 text-sm">
+                  <span className="truncate flex-1">{p.title}</span>
+                  <span className="font-mono text-xs">{p.boostScore}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Availability Dialog */}
+      <Dialog open={!!availDialog} onOpenChange={(o) => !o && setAvailDialog(null)}>
+        <DialogContent className="sm:max-w-md max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{availDialog === "in_stock" ? "In Stock" : availDialog === "low_stock" ? "Low Stock" : "Out of Stock"} Products</DialogTitle>
+            <DialogDescription>{availProducts.length} products</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {availProducts.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border/50 p-2.5 cursor-pointer hover:bg-muted/30" onClick={() => { setAvailDialog(null); setSelectedProduct(p); setProductDialogOpen(true); }}>
+                <img src={p.image} alt={p.title} className="w-8 h-8 rounded object-cover" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{p.title}</div>
+                  <div className="text-xs text-muted-foreground">€{p.price} · Boost {p.boostScore}</div>
+                </div>
+                <Switch checked={p.included} onCheckedChange={(v) => updateProduct(p.id, { included: v })} />
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Area chart — agent queries */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-2 rounded-xl border border-border/50 bg-card p-5"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="lg:col-span-2 rounded-xl border border-border/50 bg-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold">Agent Queries & Conversions</h3>
             <span className="text-xs text-muted-foreground">This week</span>
@@ -152,24 +317,17 @@ export function OverviewSection() {
         </motion.div>
 
         {/* Donut — availability */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="rounded-xl border border-border/50 bg-card p-5"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="rounded-xl border border-border/50 bg-card p-5">
           <h3 className="text-sm font-semibold mb-2">Availability</h3>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie
                 data={availabilityData}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={72}
-                paddingAngle={3}
-                dataKey="value"
-                stroke="none"
+                cx="50%" cy="50%"
+                innerRadius={50} outerRadius={72}
+                paddingAngle={3} dataKey="value" stroke="none"
+                onClick={handlePieClick}
+                className="cursor-pointer"
               >
                 {availabilityData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
@@ -180,94 +338,106 @@ export function OverviewSection() {
           </ResponsiveContainer>
           <div className="flex flex-col gap-1.5 mt-1">
             {availabilityData.map((d) => (
-              <div key={d.name} className="flex items-center gap-2 text-xs">
+              <button key={d.name} onClick={() => setAvailDialog(d.key)} className="flex items-center gap-2 text-xs hover:bg-muted/30 rounded px-1 py-0.5 transition-colors">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.fill }} />
-                <span className="text-muted-foreground flex-1">{d.name}</span>
+                <span className="text-muted-foreground flex-1 text-left">{d.name}</span>
                 <span className="font-medium">{d.value}</span>
-              </div>
+              </button>
             ))}
           </div>
         </motion.div>
       </div>
 
-      {/* Second row: bar chart + top products */}
+      {/* Second row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Bar chart — revenue by category */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="lg:col-span-2 rounded-xl border border-border/50 bg-card p-5"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="lg:col-span-2 rounded-xl border border-border/50 bg-card p-5">
           <h3 className="text-sm font-semibold mb-4">Revenue by Category</h3>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={categoryData}>
+            <BarChart data={categoryData} onClick={(e) => e?.activePayload?.[0]?.payload && handleBarClick(e.activePayload[0].payload)}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 15%)" />
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="revenue" name="Est. Revenue" radius={[4, 4, 0, 0]} fill="hsl(0 0% 75%)" />
+              <Bar dataKey="revenue" name="Est. Revenue" radius={[4, 4, 0, 0]} fill="hsl(0 0% 75%)" className="cursor-pointer" />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Featured products */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="rounded-xl border border-border/50 bg-card p-5"
-        >
+        {/* Top products */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="rounded-xl border border-border/50 bg-card p-5">
           <h3 className="text-sm font-semibold mb-3">Top Boosted Products</h3>
           <div className="space-y-3">
-            {topProducts.map((p, i) => (
-              <div key={p.id} className="flex items-center gap-3">
+            {topProducts.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/30 rounded-lg p-1 -m-1 transition-colors" onClick={() => { setSelectedProduct(p); setProductDialogOpen(true); }}>
                 <img src={p.image} alt={p.title} className="w-10 h-10 rounded-lg object-cover" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{p.title}</div>
                   <div className="text-xs text-muted-foreground">€{p.price}</div>
                 </div>
-                <div className="text-xs font-medium px-2 py-0.5 rounded-full border border-border/50">
-                  +{p.boostScore}
-                </div>
+                <div className="text-xs font-medium px-2 py-0.5 rounded-full border border-border/50">+{p.boostScore}</div>
               </div>
             ))}
           </div>
         </motion.div>
       </div>
 
+      {/* Category Sheet */}
+      <CategorySheetPanel category={selectedCategory} open={categorySheetOpen} onOpenChange={setCategorySheetOpen} />
+
+      {/* Product Detail Dialog */}
+      <ProductDetailDialog product={selectedProduct} open={productDialogOpen} onOpenChange={setProductDialogOpen} />
+
+      {/* Suggestion Confirm Dialog */}
+      <Dialog open={suggestionConfirm !== null} onOpenChange={(o) => !o && setSuggestionConfirm(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Apply suggestion?</DialogTitle>
+            <DialogDescription>
+              {suggestionConfirm !== null && suggestions[suggestionConfirm]?.desc}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setSuggestionConfirm(null)}>Cancel</Button>
+            <Button onClick={() => suggestionConfirm !== null && handleApplySuggestion(suggestionConfirm)}>Apply</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Suggestions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.55 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
         <h3 className="text-sm font-semibold mb-3">AI Suggestions</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {suggestions.map((s, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 + i * 0.05 }}
-              className="flex items-start gap-3 rounded-xl border border-border/50 bg-card p-4 hover:border-border transition-colors cursor-pointer group"
-            >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                s.type === "warning" ? "bg-red-500/10" : s.type === "insight" ? "bg-blue-500/10" : "bg-primary/10"
-              }`}>
-                <s.icon className={`h-4 w-4 ${
-                  s.type === "warning" ? "text-red-400" : s.type === "insight" ? "text-blue-400" : "text-primary"
-                }`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium flex items-center gap-1">
-                  {s.title}
-                  <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          {suggestions.map((s, i) => {
+            const applied = appliedSuggestions.has(i);
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6 + i * 0.05 }}
+                onClick={() => !applied && setSuggestionConfirm(i)}
+                className={`flex items-start gap-3 rounded-xl border border-border/50 bg-card p-4 transition-colors group ${
+                  applied ? "opacity-60" : "hover:border-border cursor-pointer"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  applied ? "bg-green-500/10" : s.type === "warning" ? "bg-red-500/10" : s.type === "insight" ? "bg-blue-500/10" : "bg-primary/10"
+                }`}>
+                  {applied ? <Check className="h-4 w-4 text-green-500" /> : <s.icon className={`h-4 w-4 ${
+                    s.type === "warning" ? "text-red-400" : s.type === "insight" ? "text-blue-400" : "text-primary"
+                  }`} />}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">{s.desc}</div>
-              </div>
-            </motion.div>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium flex items-center gap-1">
+                    {s.title}
+                    {applied && <span className="text-xs text-green-500 font-normal ml-1">Applied</span>}
+                    {!applied && <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{s.desc}</div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </motion.div>
     </div>
