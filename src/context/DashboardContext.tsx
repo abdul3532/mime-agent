@@ -53,14 +53,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [lastScannedAt, setLastScannedAt] = useState<Date | null>(null);
   const [seeding, setSeeding] = useState(false);
 
-  // Load products from DB or demo mode
+  // Load products from DB
   useEffect(() => {
     if (!user) {
-      // Demo mode: load mock products into local state
-      import("@/data/mockProducts").then(({ mockProducts }) => {
-        setProducts(mockProducts);
-        setLoading(false);
-      });
+      // No user: empty state, no mock data
+      setProducts([]);
+      setLoading(false);
       return;
     }
     const loadData = async () => {
@@ -181,32 +179,30 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [user, rules, toast]);
 
   const seedDemoProducts = useCallback(async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Sign in to load demo data.", variant: "destructive" });
+      return;
+    }
     setSeeding(true);
     try {
       const { mockProducts } = await import("@/data/mockProducts");
-      if (!user) {
-        // Demo mode: just set local state
-        setProducts(mockProducts);
-        toast({ title: "Demo loaded", description: "Sample products loaded locally." });
-      } else {
-        const inserts = mockProducts.map((p) => ({
-          user_id: user.id,
-          title: p.title,
-          price: p.price,
-          currency: p.currency,
-          availability: p.availability,
-          category: p.category,
-          tags: p.tags,
-          inventory: p.inventory,
-          url: p.url,
-          image: p.image,
-          boost_score: p.boostScore,
-          included: p.included,
-        }));
-        await supabase.from("products").insert(inserts);
-        await reloadProducts();
-        toast({ title: "Demo loaded", description: "Sample products added to your dashboard." });
-      }
+      const inserts = mockProducts.map((p) => ({
+        user_id: user.id,
+        title: p.title,
+        price: p.price,
+        currency: p.currency,
+        availability: p.availability,
+        category: p.category,
+        tags: p.tags,
+        inventory: p.inventory,
+        url: p.url,
+        image: p.image,
+        boost_score: p.boostScore,
+        included: p.included,
+      }));
+      await supabase.from("products").insert(inserts);
+      await reloadProducts();
+      toast({ title: "Demo loaded", description: "Sample products added to your dashboard." });
     } catch (e) {
       toast({ title: "Error", description: "Failed to load demo data.", variant: "destructive" });
     } finally {
