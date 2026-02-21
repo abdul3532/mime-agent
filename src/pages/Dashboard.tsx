@@ -77,7 +77,7 @@ function DashboardInner() {
       const stepTimer3 = setTimeout(() => setScanStep("Saving to database..."), 25000);
 
       const { scrapeProducts } = await import("@/lib/api/scrapeProducts");
-      const result = await scrapeProducts(storeUrl);
+      const result = await scrapeProducts(storeUrl, crypto.randomUUID());
 
       clearTimeout(stepTimer);
       clearTimeout(stepTimer2);

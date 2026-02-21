@@ -205,6 +205,45 @@ export type Database = {
         }
         Relationships: []
       }
+      scrape_progress: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          extracted_products: number
+          id: string
+          run_id: string
+          scraped_pages: number
+          status: string
+          total_urls: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          extracted_products?: number
+          id?: string
+          run_id: string
+          scraped_pages?: number
+          status?: string
+          total_urls?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          extracted_products?: number
+          id?: string
+          run_id?: string
+          scraped_pages?: number
+          status?: string
+          total_urls?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
