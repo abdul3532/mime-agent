@@ -25,6 +25,8 @@ interface DashboardContextType {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   loading: boolean;
+  rescanning: boolean;
+  setRescanning: (v: boolean) => void;
   saveProducts: () => Promise<void>;
   saveRules: () => Promise<void>;
   reloadProducts: () => Promise<void>;
@@ -40,6 +42,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
+  const [rescanning, setRescanning] = useState(false);
 
   // Load products from DB
   useEffect(() => {
@@ -157,7 +160,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       rules, setRules,
       appliedSuggestions, applySuggestion,
       activeTab, setActiveTab,
-      loading, saveProducts, saveRules, reloadProducts,
+      loading, rescanning, setRescanning,
+      saveProducts, saveRules, reloadProducts,
     }}>
       {children}
     </DashboardContext.Provider>
