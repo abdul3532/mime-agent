@@ -40,7 +40,7 @@ export function Navbar() {
     >
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center">
-          <img src={mimeLogo} alt="MIME" className="h-14 -my-3" />
+          <img src={mimeLogo} alt="MIME" className="h-24 -my-8" />
         </Link>
 
         {/* Desktop */}
