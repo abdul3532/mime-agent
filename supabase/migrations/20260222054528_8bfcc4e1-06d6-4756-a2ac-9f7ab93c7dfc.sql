@@ -1,0 +1,1 @@
+ALTER TABLE public.storefront_files ADD CONSTRAINT storefront_files_user_id_unique UNIQUE (user_id);
