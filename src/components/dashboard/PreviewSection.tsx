@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, ChevronDown, ChevronUp, CheckCircle2, XCircle, ArrowLeftRight } from "lucide-react";
+import { Copy, Download, ChevronDown, ChevronUp, CheckCircle2, XCircle, ArrowLeftRight, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboard } from "@/context/DashboardContext";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -27,10 +30,25 @@ const schema = {
 
 export function PreviewSection({ storeId }: Props) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { products, rules, computeEffectiveScore } = useDashboard();
   const [showExplain, setShowExplain] = useState(false);
   const [validateOpen, setValidateOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [llmsTxt, setLlmsTxt] = useState<string | null>(null);
+
+  // Load existing llms.txt
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("storefront_files")
+      .select("llms_txt")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.llms_txt) setLlmsTxt(data.llms_txt);
+      });
+  }, [user]);
 
   const buildJson = (prods: typeof products) => {
     const scoredProducts = prods
@@ -73,10 +91,12 @@ export function PreviewSection({ storeId }: Props) {
   const json = buildJson(products);
   const liveJson = buildJson([]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(json);
-    toast({ title: "Copied", description: "JSON copied to clipboard." });
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
+
+  const handleCopy = () => copy(json, "JSON");
 
   // Simple validation
   const validationResults = (() => {
@@ -100,43 +120,73 @@ export function PreviewSection({ storeId }: Props) {
     <div className="space-y-4">
       <h2 className="font-heading text-2xl font-bold">Preview</h2>
 
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={handleCopy}>
-          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy JSON
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => toast({ title: "Download", description: "Download started (simulated)." })}>
-          <Download className="h-3.5 w-3.5 mr-1.5" /> Download
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setValidateOpen(true)}>
-          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Validate JSON
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setCompareOpen(true)}>
-          <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> Compare with live
-        </Button>
-      </div>
+      <Tabs defaultValue="json" className="w-full">
+        <TabsList className="mb-3">
+          <TabsTrigger value="json">Product JSON</TabsTrigger>
+          <TabsTrigger value="llms">
+            <FileText className="h-3.5 w-3.5 mr-1.5" /> llms.txt
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="code-block max-h-[500px] overflow-y-auto">
-        <pre className="text-xs">{json}</pre>
-      </div>
+        <TabsContent value="json" className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={handleCopy}>
+              <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy JSON
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => toast({ title: "Download", description: "Download started (simulated)." })}>
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Download
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setValidateOpen(true)}>
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Validate JSON
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setCompareOpen(true)}>
+              <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> Compare with live
+            </Button>
+          </div>
 
-      <button
-        onClick={() => setShowExplain(!showExplain)}
-        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {showExplain ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        Explain fields
-      </button>
+          <div className="code-block max-h-[500px] overflow-y-auto">
+            <pre className="text-xs">{json}</pre>
+          </div>
 
-      {showExplain && (
-        <div className="card-elevated p-4 space-y-2">
-          {fieldExplanations.map((f) => (
-            <div key={f.field} className="flex gap-3 text-sm">
-              <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono shrink-0">{f.field}</code>
-              <span className="text-muted-foreground">{f.desc}</span>
+          <button
+            onClick={() => setShowExplain(!showExplain)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showExplain ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            Explain fields
+          </button>
+
+          {showExplain && (
+            <div className="card-elevated p-4 space-y-2">
+              {fieldExplanations.map((f) => (
+                <div key={f.field} className="flex gap-3 text-sm">
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono shrink-0">{f.field}</code>
+                  <span className="text-muted-foreground">{f.desc}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
+        </TabsContent>
+
+        <TabsContent value="llms" className="space-y-4">
+          {llmsTxt ? (
+            <>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => copy(llmsTxt, "llms.txt")}>
+                  <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy llms.txt
+                </Button>
+              </div>
+              <div className="code-block max-h-[500px] overflow-y-auto">
+                <pre className="text-xs whitespace-pre-wrap">{llmsTxt}</pre>
+              </div>
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground py-8 text-center">
+              No llms.txt generated yet. Go to the <strong>Publish</strong> tab to generate one.
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Validate Dialog */}
       <Dialog open={validateOpen} onOpenChange={setValidateOpen}>
