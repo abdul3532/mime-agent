@@ -37,6 +37,8 @@ interface DashboardContextType {
   seedDemoProducts: () => Promise<void>;
   seeding: boolean;
   computeEffectiveScore: (product: Product) => { effectiveScore: number; delta: number; matchingRules: Rule[] };
+  storeId: string;
+  storeUrl: string;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -53,6 +55,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [scanStep, setScanStep] = useState("");
   const [lastScannedAt, setLastScannedAt] = useState<Date | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [storeId, setStoreId] = useState("");
+  const [storeUrl, setStoreUrl] = useState("");
 
   // Load products from DB
   useEffect(() => {
@@ -64,6 +68,36 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
     const loadData = async () => {
       setLoading(true);
+
+      // Load profile and resolve store_id
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("store_id, store_url, domain")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile) {
+        const url = (profile as any).store_url || "";
+        setStoreUrl(url);
+        localStorage.setItem("mime_store_url", url);
+
+        let sid = (profile as any).store_id as string | null;
+        if (!sid) {
+          // Generate store_id from domain/store_url
+          const raw = (profile as any).domain || url || "store";
+          const slug = raw
+            .replace(/^(https?:\/\/)?(www\.)?/, "")
+            .replace(/[^a-z0-9]+/gi, "-")
+            .replace(/^-|-$/g, "")
+            .toLowerCase()
+            .slice(0, 24);
+          const suffix = Math.random().toString(36).slice(2, 6);
+          sid = `${slug}-${suffix}`;
+          await supabase.from("profiles").update({ store_id: sid } as any).eq("user_id", user.id);
+        }
+        setStoreId(sid);
+        localStorage.setItem("mime_store_id", sid);
+      }
       const { data: dbProducts } = await supabase
         .from("products")
         .select("*")
@@ -280,6 +314,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       saveProducts, saveRules, reloadProducts,
       seedDemoProducts, seeding,
       computeEffectiveScore,
+      storeId, storeUrl,
     }}>
       {children}
     </DashboardContext.Provider>

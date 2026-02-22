@@ -46,15 +46,13 @@ const navGroups = [
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, scanStep, setScanStep, lastScannedAt, setLastScannedAt } = useDashboard();
+  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, scanStep, setScanStep, lastScannedAt, setLastScannedAt, storeId, storeUrl } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
-  const storeUrl = localStorage.getItem("mime_store_url") || "";
-  const storeId = localStorage.getItem("mime_store_id") || "";
   const storeName = storeUrl ? new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname : "No store connected";
 
   const lastScannedLabel = useMemo(() => {
