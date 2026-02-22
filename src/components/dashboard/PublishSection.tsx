@@ -26,6 +26,25 @@ export function PublishSection({ storeId }: Props) {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "paijyobnnrcidapjqcln";
   const endpoint = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${storeId}`;
   const snippet = `<link rel="alternate" type="application/json" href="${endpoint}" />`;
+  const trackBase = `https://${projectId}.supabase.co/functions/v1/track-event`;
+
+  const pixelSnippet = `<!-- MIME Tracking Pixel — paste before </body> -->
+<script>
+(function(){
+  var s = "${trackBase}";
+  var sid = "${storeId}";
+  // Track page view
+  new Image().src = s + "?event=product_view&store_id=" + sid + "&agent=" + encodeURIComponent(navigator.userAgent);
+  // Expose helper for cart & purchase events
+  window.mimeTrack = function(event, productId, meta) {
+    fetch(s, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_type: event, store_id: sid, product_id: productId || null, agent_name: navigator.userAgent, metadata: meta || {} })
+    });
+  };
+})();
+</script>`;
 
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -109,6 +128,21 @@ export function PublishSection({ storeId }: Props) {
         </div>
       </div>
 
+      {/* Tracking pixel */}
+      <div className="card-elevated p-5 space-y-3">
+        <h3 className="text-sm font-semibold">Tracking pixel snippet</h3>
+        <p className="text-xs text-muted-foreground">
+          Paste before {'</body>'} to track product views, cart adds & purchases from your site. Call{" "}
+          <code className="text-xs bg-muted px-1 rounded">mimeTrack("add_to_cart", productId)</code> for custom events.
+        </p>
+        <div className="code-block flex items-start justify-between gap-2 max-h-48 overflow-y-auto">
+          <code className="text-xs break-all whitespace-pre-wrap">{pixelSnippet}</code>
+          <button onClick={() => copy(pixelSnippet, "Tracking pixel")} className="shrink-0 text-muted-foreground hover:text-foreground mt-0.5">
+            <Copy className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
       {/* Verify */}
       <div className="card-elevated p-5 space-y-4">
         <h3 className="text-sm font-semibold">Verify installation</h3>
@@ -117,7 +151,7 @@ export function PublishSection({ storeId }: Props) {
           {verifying ? "Verifying..." : "Verify"}
         </Button>
         {verified === true && (
-          <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+          <div className="flex items-center gap-2 text-sm font-medium text-primary">
             <CheckCircle2 className="h-4 w-4" /> Installation verified — agents can discover your store.
           </div>
         )}
