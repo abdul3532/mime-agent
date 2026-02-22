@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
   const { data: profile } = await supabase
     .from("profiles")
     .select("user_id, store_name, store_logo_url, domain")
-    .eq("id", storeId)
+    .eq("store_id", storeId)
     .single();
 
   if (!profile) {
