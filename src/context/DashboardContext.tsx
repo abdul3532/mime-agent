@@ -361,6 +361,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setRules([]);
       setRawSamples(null);
       setLastScannedAt(null);
+      localStorage.removeItem("mime_active_storefront_id");
+      setStorefront(null);
+      setStorefronts([]);
       toast({ title: "Deleted", description: "All store data has been removed." });
     } catch (e) {
       toast({ title: "Error", description: "Failed to delete data.", variant: "destructive" });
