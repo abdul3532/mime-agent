@@ -85,6 +85,27 @@ export function AgentAnalyticsSection() {
       setLoading(false);
     };
     load();
+
+    // Realtime subscription for live updates
+    const channel = supabase
+      .channel("agent-events-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "agent_events",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          setEvents((prev) => [payload.new as AgentEvent, ...prev].slice(0, 500));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const stats = useMemo(() => {
