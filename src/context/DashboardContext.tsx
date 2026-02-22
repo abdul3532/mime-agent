@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from "react";
 import { Product } from "@/data/mockProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -36,6 +36,7 @@ interface DashboardContextType {
   reloadProducts: () => Promise<void>;
   seedDemoProducts: () => Promise<void>;
   seeding: boolean;
+  computeEffectiveScore: (product: Product) => { effectiveScore: number; delta: number; matchingRules: Rule[] };
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -105,9 +106,63 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     loadData();
   }, [user]);
 
+  // Debounced auto-save for product changes (boost score, included, tags)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUpdatesRef = useRef<Map<string, Partial<Product>>>(new Map());
+
+  const flushProductUpdates = useCallback(async () => {
+    if (!user || pendingUpdatesRef.current.size === 0) return;
+    const updates = new Map(pendingUpdatesRef.current);
+    pendingUpdatesRef.current.clear();
+
+    for (const [id, changes] of updates) {
+      const dbUpdates: Record<string, unknown> = {};
+      if (changes.boostScore !== undefined) dbUpdates.boost_score = changes.boostScore;
+      if (changes.included !== undefined) dbUpdates.included = changes.included;
+      if (changes.tags !== undefined) dbUpdates.tags = changes.tags;
+      if (Object.keys(dbUpdates).length > 0) {
+        await supabase.from("products").update(dbUpdates).eq("id", id).eq("user_id", user.id);
+      }
+    }
+  }, [user]);
+
   const updateProduct = useCallback((id: string, updates: Partial<Product>) => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-  }, []);
+
+    // Queue for auto-save
+    const existing = pendingUpdatesRef.current.get(id) || {};
+    pendingUpdatesRef.current.set(id, { ...existing, ...updates });
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      flushProductUpdates();
+    }, 1500);
+  }, [flushProductUpdates]);
+
+  // Compute effective score with rules applied
+  const computeEffectiveScore = useCallback((p: Product) => {
+    const matchingRules: Rule[] = [];
+    let delta = 0;
+    for (const r of rules) {
+      let matches = false;
+      if (r.action === "exclude" && r.field === "availability" && p.availability === r.value) {
+        matchingRules.push(r);
+        continue;
+      }
+      if (r.field === "tags" && r.condition === "contains" && p.tags.includes(r.value)) matches = true;
+      if (r.field === "price" && r.condition === "less_than" && p.price < Number(r.value)) matches = true;
+      if (r.field === "price" && r.condition === "greater_than" && p.price > Number(r.value)) matches = true;
+      if (r.field === "category" && r.condition === "equals" && p.category === r.value) matches = true;
+      if (r.field === "availability" && r.condition === "equals" && p.availability === r.value) matches = true;
+      if (r.field === "margin" && r.condition === "greater_than" && p.margin > Number(r.value)) matches = true;
+      if (matches) {
+        delta += r.amount;
+        matchingRules.push(r);
+      }
+    }
+    const effectiveScore = Math.max(0, Math.min(10, p.boostScore + delta));
+    return { effectiveScore, delta, matchingRules };
+  }, [rules]);
 
   const applySuggestion = useCallback((index: number) => {
     setAppliedSuggestions((prev) => new Set(prev).add(index));
@@ -221,6 +276,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       lastScannedAt, setLastScannedAt,
       saveProducts, saveRules, reloadProducts,
       seedDemoProducts, seeding,
+      computeEffectiveScore,
     }}>
       {children}
     </DashboardContext.Provider>

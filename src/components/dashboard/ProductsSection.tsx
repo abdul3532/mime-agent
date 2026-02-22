@@ -24,7 +24,7 @@ function extractDomain(url: string): string {
 }
 
 export function ProductsSection() {
-  const { products, setProducts, updateProduct, rescanning, scanStep, seedDemoProducts, seeding } = useDashboard();
+  const { products, setProducts, updateProduct, rescanning, scanStep, seedDemoProducts, seeding, computeEffectiveScore } = useDashboard();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [availFilter, setAvailFilter] = useState<string>("all");
@@ -264,6 +264,14 @@ export function ProductsSection() {
                       className="w-20"
                     />
                     <span className="text-xs font-mono w-4">{p.boostScore}</span>
+                    {(() => {
+                      const { delta } = computeEffectiveScore(p);
+                      return delta !== 0 ? (
+                        <span className={`text-xs font-mono ${delta > 0 ? "text-green-600" : "text-red-600"}`}>
+                          {delta > 0 ? `+${delta}` : delta}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 </td>
               </tr>
