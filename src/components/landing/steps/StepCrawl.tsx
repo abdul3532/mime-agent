@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   storeUrl: string;
+  storeId: string;
   onComplete: () => void;
 }
 
@@ -19,7 +20,7 @@ const stages = [
   "Save to dashboard",
 ];
 
-export function StepCrawl({ storeUrl, onComplete }: Props) {
+export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [stage, setStage] = useState(0);
@@ -98,6 +99,15 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
 
         setStage(3);
         setResult(res);
+
+        // Save store_id and store_url to user's profile
+        if (user && storeId) {
+          const cleanDomain = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+          await supabase
+            .from("profiles")
+            .update({ store_id: storeId, store_url: storeUrl, domain: cleanDomain })
+            .eq("user_id", user.id);
+        }
 
         // Final progress fetch
         const finalProgress = await pollScrapeProgress(runId);

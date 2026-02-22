@@ -212,7 +212,7 @@ export function WizardContainer() {
                     <Button variant="ghost" size="sm" onClick={goBack} className="mb-3 -ml-2 text-muted-foreground hover:text-foreground">
                       <ChevronLeft className="h-4 w-4 mr-1" /> Back
                     </Button>
-                    <StepCrawl storeUrl={storeUrl} onComplete={advanceStep} />
+                    <StepCrawl storeUrl={storeUrl} storeId={storeId} onComplete={advanceStep} />
                   </motion.div>
                 )}
               </AnimatePresence>
