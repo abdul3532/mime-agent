@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
       await send({ step: 5, message: "→ Saving to storefront endpoint..." });
 
       const storeId = profile?.store_id;
-      await admin.from("storefront_files").insert({
+      await admin.from("storefront_files").upsert({
         user_id: user.id,
         store_id: storeId,
         llms_txt: llmsTxt,
@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
         generated_at: new Date().toISOString(),
         product_count: enrichedProducts.length,
         section_count: Object.keys(sectionMap).length
-      });
+      }, { onConflict: "user_id" });
 
       await send({ step: 5, message: "✓ Done. Your storefront is live.", done: true, store_id: storeId });
 
