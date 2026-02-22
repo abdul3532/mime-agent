@@ -9,7 +9,7 @@ import {
   Bot, Eye, ShoppingCart, TrendingUp, Package, Zap, CalendarIcon,
 } from "lucide-react";
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
@@ -80,6 +80,14 @@ export function AgentAnalyticsSection() {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(subDays(new Date(), 30));
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [activePreset, setActivePreset] = useState<string>("30d");
+
+  const applyPreset = (key: string) => {
+    setActivePreset(key);
+    if (key === "7d") { setDateFrom(subDays(new Date(), 7)); setDateTo(new Date()); }
+    else if (key === "30d") { setDateFrom(subDays(new Date(), 30)); setDateTo(new Date()); }
+    else { setDateFrom(undefined); setDateTo(undefined); }
+  };
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -163,7 +171,17 @@ export function AgentAnalyticsSection() {
       { name: "Purchases", value: purchases },
     ];
 
-    return { feedViews, productViews, recommendations, cartAdds, purchases, agentData, topViewedProducts, funnel };
+    // Daily trend
+    const dayMap = new Map<string, number>();
+    filteredEvents.forEach((e) => {
+      const day = format(new Date(e.created_at), "MMM d");
+      dayMap.set(day, (dayMap.get(day) || 0) + 1);
+    });
+    const dailyTrend = [...dayMap.entries()]
+      .map(([date, count]) => ({ date, count }))
+      .reverse();
+
+    return { feedViews, productViews, recommendations, cartAdds, purchases, agentData, topViewedProducts, funnel, dailyTrend };
   }, [filteredEvents, products]);
 
   if (loading) {
@@ -197,27 +215,33 @@ export function AgentAnalyticsSection() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="font-heading text-2xl font-bold">Agent Analytics</h2>
         <div className="flex items-center gap-2 flex-wrap">
+          {[{ key: "7d", label: "7 days" }, { key: "30d", label: "30 days" }, { key: "all", label: "All time" }].map((p) => (
+            <Button key={p.key} variant={activePreset === p.key ? "default" : "outline"} size="sm" className="h-7 text-xs px-2.5" onClick={() => applyPreset(p.key)}>
+              {p.label}
+            </Button>
+          ))}
+          <span className="text-xs text-muted-foreground mx-1">|</span>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("h-8 text-xs justify-start", !dateFrom && "text-muted-foreground")}>
+              <Button variant="outline" size="sm" className={cn("h-7 text-xs justify-start", !dateFrom && "text-muted-foreground")} onClick={() => setActivePreset("")}>
                 <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
-                {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+                {dateFrom ? format(dateFrom, "MMM d") : "From"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+              <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setActivePreset(""); }} initialFocus className={cn("p-3 pointer-events-auto")} />
             </PopoverContent>
           </Popover>
           <span className="text-xs text-muted-foreground">→</span>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("h-8 text-xs justify-start", !dateTo && "text-muted-foreground")}>
+              <Button variant="outline" size="sm" className={cn("h-7 text-xs justify-start", !dateTo && "text-muted-foreground")} onClick={() => setActivePreset("")}>
                 <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
-                {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+                {dateTo ? format(dateTo, "MMM d") : "To"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+              <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setActivePreset(""); }} initialFocus className={cn("p-3 pointer-events-auto")} />
             </PopoverContent>
           </Popover>
           <span className="text-xs text-muted-foreground">{filteredEvents.length} events</span>
@@ -232,6 +256,23 @@ export function AgentAnalyticsSection() {
         <KpiCard label="Cart adds" value={stats.cartAdds} icon={ShoppingCart} index={3} />
         <KpiCard label="Purchases" value={stats.purchases} icon={TrendingUp} index={4} />
       </div>
+
+      {/* Daily Trend */}
+      {stats.dailyTrend.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+          className="rounded-xl border border-border/50 bg-card p-5">
+          <h3 className="text-sm font-semibold mb-4">Daily Event Volume</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={stats.dailyTrend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 15%)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "hsl(0 0% 45%)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Line type="monotone" dataKey="count" name="Events" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: "hsl(var(--primary))" }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </motion.div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
