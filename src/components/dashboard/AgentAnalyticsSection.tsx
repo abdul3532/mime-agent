@@ -1,16 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
+import { format, subDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContext";
 import { useCountUp } from "@/hooks/useCountUp";
 import {
-  Bot, Eye, ShoppingCart, TrendingUp, Package, Zap,
+  Bot, Eye, ShoppingCart, TrendingUp, Package, Zap, CalendarIcon,
 } from "lucide-react";
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface AgentEvent {
   id: string;
@@ -71,6 +78,8 @@ export function AgentAnalyticsSection() {
   const { products } = useDashboard();
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(subDays(new Date(), 30));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -108,16 +117,25 @@ export function AgentAnalyticsSection() {
     };
   }, [user]);
 
-  const stats = useMemo(() => {
-    const feedViews = events.filter((e) => e.event_type === "feed_view").length;
-    const productViews = events.filter((e) => e.event_type === "product_view").length;
-    const recommendations = events.filter((e) => e.event_type === "product_recommendation").length;
-    const cartAdds = events.filter((e) => e.event_type === "add_to_cart").length;
-    const purchases = events.filter((e) => e.event_type === "purchase").length;
+  const filteredEvents = useMemo(() => {
+    if (!dateFrom && !dateTo) return events;
+    return events.filter((e) => {
+      const d = new Date(e.created_at);
+      const from = dateFrom ? startOfDay(dateFrom) : new Date(0);
+      const to = dateTo ? endOfDay(dateTo) : new Date();
+      return isWithinInterval(d, { start: from, end: to });
+    });
+  }, [events, dateFrom, dateTo]);
 
-    // Agent breakdown
+  const stats = useMemo(() => {
+    const feedViews = filteredEvents.filter((e) => e.event_type === "feed_view").length;
+    const productViews = filteredEvents.filter((e) => e.event_type === "product_view").length;
+    const recommendations = filteredEvents.filter((e) => e.event_type === "product_recommendation").length;
+    const cartAdds = filteredEvents.filter((e) => e.event_type === "add_to_cart").length;
+    const purchases = filteredEvents.filter((e) => e.event_type === "purchase").length;
+
     const agentMap = new Map<string, number>();
-    events.forEach((e) => {
+    filteredEvents.forEach((e) => {
       const name = e.agent_name || "Unknown";
       agentMap.set(name, (agentMap.get(name) || 0) + 1);
     });
@@ -125,9 +143,8 @@ export function AgentAnalyticsSection() {
       .sort((a, b) => b[1] - a[1])
       .map(([name, value]) => ({ name, value }));
 
-    // Most-viewed products
     const productViewMap = new Map<string, number>();
-    events.filter((e) => e.event_type === "product_view" && e.product_id).forEach((e) => {
+    filteredEvents.filter((e) => e.event_type === "product_view" && e.product_id).forEach((e) => {
       productViewMap.set(e.product_id!, (productViewMap.get(e.product_id!) || 0) + 1);
     });
     const topViewedProducts = [...productViewMap.entries()]
@@ -138,7 +155,6 @@ export function AgentAnalyticsSection() {
         return { productId, title: product?.title || "Unknown", image: product?.image, views };
       });
 
-    // Conversion funnel
     const funnel = [
       { name: "Feed Views", value: feedViews },
       { name: "Product Views", value: productViews },
@@ -148,7 +164,7 @@ export function AgentAnalyticsSection() {
     ];
 
     return { feedViews, productViews, recommendations, cartAdds, purchases, agentData, topViewedProducts, funnel };
-  }, [events, products]);
+  }, [filteredEvents, products]);
 
   if (loading) {
     return (
@@ -178,9 +194,34 @@ export function AgentAnalyticsSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="font-heading text-2xl font-bold">Agent Analytics</h2>
-        <span className="text-xs text-muted-foreground">{events.length} events tracked</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("h-8 text-xs justify-start", !dateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-xs text-muted-foreground">→</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("h-8 text-xs justify-start", !dateTo && "text-muted-foreground")}>
+                <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                {dateTo ? format(dateTo, "MMM d, yyyy") : "To"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-xs text-muted-foreground">{filteredEvents.length} events</span>
+        </div>
       </div>
 
       {/* KPIs */}
