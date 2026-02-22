@@ -85,6 +85,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           image: p.image || "",
           boostScore: p.boost_score,
           included: p.included,
+          agentNotes: p.agent_notes || undefined,
         })));
         if (dbProducts.length > 0) {
           const latest = dbProducts.reduce((a, b) => a.created_at > b.created_at ? a : b);
@@ -120,6 +121,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (changes.boostScore !== undefined) dbUpdates.boost_score = changes.boostScore;
       if (changes.included !== undefined) dbUpdates.included = changes.included;
       if (changes.tags !== undefined) dbUpdates.tags = changes.tags;
+      if (changes.agentNotes !== undefined) dbUpdates.agent_notes = changes.agentNotes;
       if (Object.keys(dbUpdates).length > 0) {
         await supabase.from("products").update(dbUpdates).eq("id", id).eq("user_id", user.id);
       }
@@ -190,9 +192,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         inventory: p.inventory,
         url: p.url || "",
         image: p.image || "",
-        boostScore: p.boost_score,
-        included: p.included,
-      })));
+          boostScore: p.boost_score,
+          included: p.included,
+          agentNotes: p.agent_notes || undefined,
+        })));
     }
     setLoading(false);
   }, [user]);
