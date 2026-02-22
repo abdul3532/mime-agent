@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
 
     let totalExtracted = 0;
     const allCategories: Set<string> = new Set();
-    const aiBatchSize = 10;
+    const aiBatchSize = 2;
 
     for (let i = 0; i < scrapedPages.length; i += aiBatchSize) {
       const batch = scrapedPages.slice(i, i + aiBatchSize);
@@ -359,6 +359,11 @@ Skip navigation, footer, about pages. Return empty array if no products found.`,
       }
 
       console.log(`AI batch ${Math.floor(i / aiBatchSize) + 1}: ${totalExtracted} products saved so far`);
+
+      // Delay between AI batches to respect rate limits (10k tokens/min)
+      if (i + aiBatchSize < scrapedPages.length) {
+        await new Promise(r => setTimeout(r, 15000));
+      }
     }
 
     console.log(`Extracted ${totalExtracted} products`);

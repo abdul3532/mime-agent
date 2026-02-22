@@ -100,13 +100,22 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         if (cancelled) return;
 
         if (!res.success) {
-          if (pollTimer) clearInterval(pollTimer);
+          // Only show auth errors immediately; for other errors, check if the function is still running
           if (res.error?.includes("Session expired") || res.error?.includes("sign in") || res.error?.includes("Unauthorized")) {
+            if (pollTimer) clearInterval(pollTimer);
             setNeedsAuth(true);
-          } else {
-            setError(res.error || "Scraping failed");
+            return;
           }
-          return;
+          // Check if the function is actually running in the background
+          const bgProgress = await pollScrapeProgress(runId);
+          if (bgProgress && !["error", "done"].includes(bgProgress.status)) {
+            // Function is running, keep polling — don't show error
+            console.log("Edge function still running, continuing to poll...");
+          } else {
+            if (pollTimer) clearInterval(pollTimer);
+            setError(res.error || "Scraping failed");
+            return;
+          }
         }
 
         // If the function returned quickly with real results, we're done
