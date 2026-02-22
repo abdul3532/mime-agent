@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { MessageSquare, Send, Sparkles, Info } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Tooltip,
   TooltipContent,
@@ -191,26 +190,7 @@ export function StepChat({ onComplete }: Props) {
 
       {canComplete && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <Button onClick={async () => {
-            // Save merchandising intent to profile (non-blocking)
-            try {
-              const { data: { user } } = await supabase.auth.getUser();
-              if (user) {
-                const userNotes = messages.filter(m => m.role === "user").map(m => m.text).join("; ");
-                const activeToggles = Object.entries(toggles).filter(([, v]) => v).map(([k]) => k);
-                await supabase.from("profiles").update({
-                  merchandising_intent: {
-                    chips: [...selectedChips],
-                    toggles: activeToggles,
-                    notes: userNotes,
-                  } as any,
-                }).eq("user_id", user.id);
-              }
-            } catch (_) {
-              // non-blocking
-            }
-            onComplete();
-          }} className="w-full h-11">
+          <Button onClick={onComplete} className="w-full h-11">
             <Sparkles className="h-4 w-4 mr-2" />
             Generate storefront
           </Button>

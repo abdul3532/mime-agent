@@ -4,7 +4,7 @@ import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
-  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User, Bot, Sparkles, Play,
+  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User, Bot,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
@@ -16,7 +16,6 @@ import { RulesSection } from "@/components/dashboard/RulesSection";
 import { PreviewSection } from "@/components/dashboard/PreviewSection";
 import { PublishSection } from "@/components/dashboard/PublishSection";
 import { AgentAnalyticsSection } from "@/components/dashboard/AgentAnalyticsSection";
-import { GenerateSection } from "@/components/dashboard/GenerateSection";
 import { GlobalSearchCommand } from "@/components/dashboard/GlobalSearchCommand";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,7 +32,6 @@ const navGroups = [
     items: [
       { id: "products", label: "Products", icon: Package },
       { id: "rules", label: "Rules & Priorities", icon: SlidersHorizontal },
-      { id: "generate", label: "Generate", icon: Sparkles },
       { id: "preview", label: "Preview", icon: Eye },
     ],
   },
@@ -46,13 +44,15 @@ const navGroups = [
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, scanStep, setScanStep, lastScannedAt, setLastScannedAt, storeId, storeUrl } = useDashboard();
+  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, scanStep, setScanStep, lastScannedAt, setLastScannedAt } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
+  const storeUrl = localStorage.getItem("mime_store_url") || "";
+  const storeId = localStorage.getItem("mime_store_id") || "";
   const storeName = storeUrl ? new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname : "No store connected";
 
   const lastScannedLabel = useMemo(() => {
@@ -205,9 +205,6 @@ function DashboardInner() {
             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground">
               <Bell className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="outline" onClick={() => navigate("/demo")} className="h-8">
-              <Play className="h-3.5 w-3.5 mr-1.5" /> Demo
-            </Button>
             <Button size="sm" variant="outline" onClick={handleRescan} disabled={rescanning} className="group h-8">
               <RefreshCw className={`h-3.5 w-3.5 mr-1.5 transition-transform ${rescanning ? "animate-spin" : "group-hover:rotate-180"} duration-500`} /> {rescanning ? "Scanning..." : "Re-scan"}
             </Button>
@@ -227,7 +224,6 @@ function DashboardInner() {
               {activeTab === "agent-analytics" && <AgentAnalyticsSection />}
               {activeTab === "products" && <ProductsSection />}
               {activeTab === "rules" && <RulesSection />}
-              {activeTab === "generate" && <GenerateSection storeId={storeId} />}
               {activeTab === "preview" && <PreviewSection storeId={storeId} />}
               {activeTab === "publish" && <PublishSection storeId={storeId} />}
             </motion.div>

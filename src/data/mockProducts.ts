@@ -12,7 +12,6 @@ export interface Product {
   image: string;
   boostScore: number;
   included: boolean;
-  agentNotes?: string;
 }
 
 const categories = ["Apparel", "Beauty", "Home", "Electronics", "Accessories", "Food & Drink"];

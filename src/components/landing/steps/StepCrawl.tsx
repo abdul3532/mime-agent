@@ -30,7 +30,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
   const [existingCount, setExistingCount] = useState(0);
   const [result, setResult] = useState<ScrapeResult | null>(null);
   const [progress, setProgress] = useState<ScrapeProgress | null>(null);
-  const [runId, setRunId] = useState(() => crypto.randomUUID());
+  const runIdRef = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
     if (authLoading) return;
@@ -45,14 +45,9 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       setAlreadyScanned(false);
       setProgress(null);
 
-      // Require auth before attempting scrape
-      if (!user) {
-        setNeedsAuth(true);
-        return;
-      }
-
       // Check if user already has products from this specific store URL
-      if (storeUrl) {
+      if (user && storeUrl) {
+        // Normalize the URL for matching (strip protocol and trailing slash)
         const normalizedUrl = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
         const { count } = await supabase
           .from("products")
@@ -67,7 +62,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         }
       }
 
-      
+      const runId = runIdRef.current;
 
       // Start polling for progress
       pollTimer = setInterval(async () => {
@@ -81,20 +76,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         else if (p.status === "scraping") setStage(1);
         else if (p.status === "extracting") setStage(2);
         else if (p.status === "saving") setStage(3);
-        else if (p.status === "done") {
-          if (pollTimer) clearInterval(pollTimer);
-          setStage(3);
-          setResult({
-            success: true,
-            products_found: p.extracted_products,
-            categories: [],
-            pages_scanned: p.scraped_pages,
-            runId,
-          });
-          setTimeout(() => {
-            if (!cancelled) setDone(true);
-          }, 800);
-        } else if (p.status === "error") {
+        else if (p.status === "error") {
           setError(p.error_message || "Scraping failed");
           if (pollTimer) clearInterval(pollTimer);
         }
@@ -102,51 +84,36 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
 
       try {
         const res = await scrapeProducts(storeUrl, runId);
+        if (pollTimer) clearInterval(pollTimer);
         if (cancelled) return;
 
         if (!res.success) {
-          // Only show auth errors immediately; for other errors, check if the function is still running
           if (res.error?.includes("Session expired") || res.error?.includes("sign in") || res.error?.includes("Unauthorized")) {
-            if (pollTimer) clearInterval(pollTimer);
             setNeedsAuth(true);
-            return;
-          }
-          // Check if the function is actually running in the background
-          const bgProgress = await pollScrapeProgress(runId);
-          if (bgProgress && !["error", "done"].includes(bgProgress.status)) {
-            // Function is running, keep polling — don't show error
-            console.log("Edge function still running, continuing to poll...");
           } else {
-            if (pollTimer) clearInterval(pollTimer);
             setError(res.error || "Scraping failed");
-            return;
           }
-        }
-
-        // If the function returned quickly with real results, we're done
-        if (res.products_found > 0) {
-          if (pollTimer) clearInterval(pollTimer);
-          setStage(3);
-          setResult(res);
-          const finalProgress = await pollScrapeProgress(runId);
-          if (finalProgress) setProgress(finalProgress);
-          setTimeout(() => {
-            if (!cancelled) setDone(true);
-          }, 800);
           return;
         }
 
-        // Function may still be running in background (timeout/fire-and-forget).
-        // Keep polling until progress shows done/error.
-        // The pollTimer is already running, just wait for it to detect completion.
+        setStage(3);
+        setResult(res);
+
+        // Final progress fetch
+        const finalProgress = await pollScrapeProgress(runId);
+        if (finalProgress) setProgress(finalProgress);
+
+        setTimeout(() => {
+          if (!cancelled) setDone(true);
+        }, 800);
       } catch (e) {
+        if (pollTimer) clearInterval(pollTimer);
         if (cancelled) return;
         
-        // Edge function may have timed out — keep polling
+        // Edge function may have timed out — check if products were saved incrementally
         const finalProgress = await pollScrapeProgress(runId);
         if (finalProgress && finalProgress.extracted_products > 0) {
           // Partial success: products were saved before timeout
-          if (pollTimer) clearInterval(pollTimer);
           setStage(3);
           setProgress({ ...finalProgress, status: "done" });
           setResult({
@@ -159,10 +126,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
           setTimeout(() => {
             if (!cancelled) setDone(true);
           }, 800);
-        } else if (finalProgress && finalProgress.status !== "error" && finalProgress.status !== "done") {
-          // Still running, keep polling
         } else {
-          if (pollTimer) clearInterval(pollTimer);
           setError(e instanceof Error ? e.message : "Unknown error");
         }
       }
@@ -173,7 +137,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [storeUrl, authLoading, runId]);
+  }, [storeUrl, authLoading]);
 
   const progressLabel = (() => {
     if (!progress) return "Starting scan...";
@@ -239,23 +203,17 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           <div className="flex items-center gap-2 text-accent-foreground font-semibold">
             <CheckCircle2 className="h-5 w-5 text-accent" />
-            Products already imported ({existingCount})
+            Products already imported
           </div>
           <p className="text-sm text-muted-foreground">
-            You already have {existingCount} products from this store. You can rescan to update them or continue.
+            You already have {existingCount} products in your dashboard. You can rescan from the dashboard if you want to update them.
           </p>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => {
-              setAlreadyScanned(false);
-              setRunId(crypto.randomUUID());
-            }} className="gap-2">
-              <RefreshCw className="h-4 w-4" /> Rescan
+            <Button onClick={() => navigate("/dashboard")} className="flex-1 gap-2">
+              <RefreshCw className="h-4 w-4" /> Go to dashboard
             </Button>
-            <Button onClick={onComplete} className="flex-1">
+            <Button variant="outline" onClick={onComplete}>
               Continue setup
-            </Button>
-            <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-              Dashboard
             </Button>
           </div>
         </motion.div>

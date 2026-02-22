@@ -54,7 +54,6 @@ export type Database = {
       }
       products: {
         Row: {
-          agent_notes: string | null
           availability: string
           boost_score: number
           category: string
@@ -70,10 +69,8 @@ export type Database = {
           updated_at: string
           url: string | null
           user_id: string
-          variants: Json | null
         }
         Insert: {
-          agent_notes?: string | null
           availability?: string
           boost_score?: number
           category?: string
@@ -89,10 +86,8 @@ export type Database = {
           updated_at?: string
           url?: string | null
           user_id: string
-          variants?: Json | null
         }
         Update: {
-          agent_notes?: string | null
           availability?: string
           boost_score?: number
           category?: string
@@ -108,7 +103,6 @@ export type Database = {
           updated_at?: string
           url?: string | null
           user_id?: string
-          variants?: Json | null
         }
         Relationships: []
       }
@@ -119,10 +113,7 @@ export type Database = {
           domain: string | null
           email: string | null
           id: string
-          merchandising_intent: Json | null
           plan_tier: string | null
-          snippet_installed: boolean
-          store_id: string | null
           store_logo_url: string | null
           store_name: string | null
           store_url: string | null
@@ -135,10 +126,7 @@ export type Database = {
           domain?: string | null
           email?: string | null
           id?: string
-          merchandising_intent?: Json | null
           plan_tier?: string | null
-          snippet_installed?: boolean
-          store_id?: string | null
           store_logo_url?: string | null
           store_name?: string | null
           store_url?: string | null
@@ -151,10 +139,7 @@ export type Database = {
           domain?: string | null
           email?: string | null
           id?: string
-          merchandising_intent?: Json | null
           plan_tier?: string | null
-          snippet_installed?: boolean
-          store_id?: string | null
           store_logo_url?: string | null
           store_name?: string | null
           store_url?: string | null
@@ -255,39 +240,6 @@ export type Database = {
           status?: string
           total_urls?: number
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      storefront_files: {
-        Row: {
-          generated_at: string | null
-          id: string
-          llms_full_txt: string | null
-          llms_txt: string | null
-          product_count: number | null
-          section_count: number | null
-          store_id: string
-          user_id: string
-        }
-        Insert: {
-          generated_at?: string | null
-          id?: string
-          llms_full_txt?: string | null
-          llms_txt?: string | null
-          product_count?: number | null
-          section_count?: number | null
-          store_id: string
-          user_id: string
-        }
-        Update: {
-          generated_at?: string | null
-          id?: string
-          llms_full_txt?: string | null
-          llms_txt?: string | null
-          product_count?: number | null
-          section_count?: number | null
-          store_id?: string
           user_id?: string
         }
         Relationships: []

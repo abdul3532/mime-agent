@@ -75,6 +75,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: "AI not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let formattedUrl = url.trim();
     if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
@@ -129,7 +136,7 @@ Deno.serve(async (req) => {
     }
 
     const allLinks: string[] = mapData.links || [];
-    const productUrls = allLinks.slice(0, 200);
+    const productUrls = allLinks.slice(0, 50);
     console.log(`Found ${allLinks.length} URLs, scraping ${productUrls.length} pages`);
 
     await updateProgress({ status: "scraping", total_urls: productUrls.length });
@@ -230,103 +237,95 @@ Deno.serve(async (req) => {
         .join("\n\n");
 
       try {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        console.error("LOVABLE_API_KEY not set");
-        continue;
-      }
+        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [
+              {
+                role: "system",
+                content: `You are a product data extractor. Given markdown content from product pages, extract structured product data.
 
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            {
-              role: "system",
-              content: `You are a product data extractor. Extract structured product data from e-commerce page markdown.
-Only extract fields you are confident about — uncertain fields should be omitted entirely, never guessed.
-Parse prices carefully: 100kr = 100 SEK, 14,95 = 14.95. Return as number.
-If a product has variants (sizes, colours), return ONE parent product with a variants array.
-Skip navigation, footer, about pages. Return empty array if no products found.`
-            },
-            { role: "user", content: `Extract all products from these pages:\n\n${pagesText}` }
-          ],
-          tools: [{
-            type: "function",
-            function: {
-              name: "extract_products",
-              description: "Extract structured product data from scraped markdown pages",
-              parameters: {
-                type: "object",
-                properties: {
-                  products: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        title: { type: "string" },
-                        price: { type: "number", description: "Numeric price. 100kr=100, 14,95=14.95" },
-                        currency: { type: "string", description: "ISO 4217: kr/SEK, €/EUR, £/GBP, $/USD" },
-                        category: { type: "string" },
-                        availability: { type: "string", enum: ["in_stock", "out_of_stock", "preorder"] },
-                        image: { type: "string" },
-                        tags: { type: "array", items: { type: "string" } },
-                        inventory: { type: "number" },
-                        url: { type: "string" },
-                        variants: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              label: { type: "string" },
-                              price: { type: "number" },
-                              availability: { type: "string" }
-                            }
-                          }
-                        }
+PRICE RULES (CRITICAL):
+- Parse prices carefully. Prices may use comma as decimal separator (e.g. "14,95" = 14.95) or dot (e.g. "14.95" = 14.95).
+- If both comma and dot appear, the LAST separator is the decimal (e.g. "1.234,56" = 1234.56, "1,234.56" = 1234.56).
+- Return price as a decimal number (e.g. 14.95, not 1495).
+- Look for the actual selling price, not crossed-out/original prices.
+- currency: detect from symbols (€=EUR, $=USD, £=GBP) or text. Default "EUR".
+
+Each product object must have:
+- title (string, the product name)
+- price (number, the selling price as a decimal e.g. 14.95)
+- currency (string, e.g. "EUR", "USD")
+- category (string, infer from breadcrumbs or content)
+- availability (string: "in_stock", "out_of_stock", or "preorder")
+- image (string, absolute URL of the main product image, or null)
+- tags (string array, relevant keywords)
+- inventory (number, estimate 100 if not specified)
+- url (string, the page URL)
+
+Extract ALL products found on each page. If a page lists multiple products (e.g. collection page), extract each one individually.
+Skip non-product pages (about, contact, FAQ, etc). Return [] if no products found.`,
+              },
+              {
+                role: "user",
+                content: `Extract products from these pages:\n\n${pagesText}`,
+              },
+            ],
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "extract_products",
+                  description: "Extract structured product data from scraped pages",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      products: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            title: { type: "string" },
+                            price: { type: "number" },
+                            currency: { type: "string" },
+                            category: { type: "string" },
+                            availability: { type: "string", enum: ["in_stock", "out_of_stock", "preorder"] },
+                            image: { type: "string" },
+                            tags: { type: "array", items: { type: "string" } },
+                            inventory: { type: "number" },
+                            url: { type: "string" },
+                          },
+                          required: ["title", "price", "currency", "category", "availability", "url"],
+                        },
                       },
-                      required: ["title", "url"]
-                    }
-                  }
+                    },
+                    required: ["products"],
+                    additionalProperties: false,
+                  },
                 },
-                required: ["products"]
-              }
-            }
-          }],
-          tool_choice: { type: "function", function: { name: "extract_products" } },
-        })
-      });
+              },
+            ],
+            tool_choice: { type: "function", function: { name: "extract_products" } },
+          }),
+        });
 
-      if (!aiRes.ok) {
-        const errText = await aiRes.text();
-        console.error(`AI extraction failed (${aiRes.status}):`, errText.substring(0, 200));
-        if (aiRes.status === 429) {
-          console.log("Rate limited, waiting 5s...");
-          await new Promise(r => setTimeout(r, 5000));
+        if (!aiRes.ok) {
+          const errText = await aiRes.text();
+          console.error(`AI extraction failed (${aiRes.status}):`, errText.substring(0, 200));
+          continue;
         }
-        continue;
-      }
 
-      const aiData = await aiRes.json();
-      const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-      const rawProducts = toolCall?.function?.arguments
-        ? JSON.parse(toolCall.function.arguments).products || []
-        : [];
-
-      // Validation gate — deterministic, no LLM
-      const parsed = { products: rawProducts.filter((p: any) => {
-        if (!p.title || typeof p.title !== "string") return false;
-        if (!p.url || typeof p.url !== "string") return false;
-        if (p.price !== undefined && (isNaN(p.price) || p.price < 0)) p.price = null;
-        if (!["in_stock","out_of_stock","preorder"].includes(p.availability)) p.availability = "in_stock";
-        return true;
-      })};
-
-      if (Array.isArray(parsed.products) && parsed.products.length > 0) {
+        const aiData = await aiRes.json();
+        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall?.function?.arguments) {
+          const parsed = JSON.parse(toolCall.function.arguments);
+          if (Array.isArray(parsed.products) && parsed.products.length > 0) {
+            // Incremental save — insert immediately
             const rows = parsed.products.map((p: any) => ({
               user_id: userId,
               title: p.title || "Untitled Product",
@@ -338,7 +337,6 @@ Skip navigation, footer, about pages. Return empty array if no products found.`
               tags: p.tags || [],
               inventory: p.inventory || 100,
               url: p.url || null,
-              variants: p.variants || null,
               boost_score: 5,
               included: true,
             }));
@@ -354,6 +352,7 @@ Skip navigation, footer, about pages. Return empty array if no products found.`
             }
             await updateProgress({ extracted_products: totalExtracted });
           }
+        }
       } catch (e) {
         console.error("AI extraction error:", e);
       }

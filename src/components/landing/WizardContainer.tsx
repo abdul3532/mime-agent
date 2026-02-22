@@ -18,8 +18,11 @@ const stepLabels = [
 ];
 
 export function WizardContainer() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [storeUrl, setStoreUrl] = useState("");
+  const [currentStep, setCurrentStep] = useState(() => {
+    const saved = localStorage.getItem("mime_wizard_step");
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [storeUrl, setStoreUrl] = useState(() => localStorage.getItem("mime_store_url") || "");
   const [storeId] = useState(() => localStorage.getItem("mime_store_id") || `store_${Math.random().toString(36).slice(2, 10)}`);
   const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -51,17 +54,13 @@ export function WizardContainer() {
     }
   };
 
-  // Clear stale wizard state on mount
   useEffect(() => {
-    localStorage.removeItem("mime_wizard_step");
-    localStorage.removeItem("mime_store_url");
-  }, []);
-
-  useEffect(() => {
+    localStorage.setItem("mime_wizard_step", currentStep.toString());
     if (storeUrl) {
       localStorage.setItem("mime_store_id", storeId);
+      localStorage.setItem("mime_store_url", storeUrl);
     }
-  }, [storeUrl, storeId]);
+  }, [storeUrl, storeId, currentStep]);
 
   return (
     <section id="wizard" className="py-20 md:py-28 relative">
