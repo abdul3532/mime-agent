@@ -13,13 +13,22 @@ export function StepUrl({ onComplete }: Props) {
   const [error, setError] = useState("");
 
   const handleSubmit = () => {
+    let trimmed = url.trim();
+    if (!trimmed) {
+      setError("Please enter a URL");
+      return;
+    }
+    // Auto-prepend https:// if missing
+    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+      trimmed = `https://${trimmed}`;
+    }
     const urlPattern = /^https?:\/\/.+\..+/;
-    if (!urlPattern.test(url)) {
+    if (!urlPattern.test(trimmed)) {
       setError("Please enter a valid URL (e.g. https://yourstore.com)");
       return;
     }
     setError("");
-    onComplete(url);
+    onComplete(trimmed);
   };
 
   return (
