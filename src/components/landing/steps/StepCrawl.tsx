@@ -64,10 +64,12 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
         .maybeSingle();
 
       let sfId: string;
-      let isExistingStorefront = false;
       if (existingSf) {
         sfId = existingSf.id;
-        isExistingStorefront = true;
+        // Delete existing products for this storefront so we crawl fresh
+        await supabase.from("products").delete().eq("storefront_id", sfId);
+        // Also clean up old scrape progress
+        await supabase.from("scrape_progress").delete().eq("storefront_id", sfId);
       } else {
         // Create new storefront using upsert to handle race conditions
         const { data: newSf, error: sfErr } = await supabase
@@ -90,20 +92,6 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       }
 
       setStorefrontId(sfId);
-
-      // Only check for existing products if storefront already existed
-      if (isExistingStorefront) {
-        const { count } = await supabase
-          .from("products")
-          .select("*", { count: "exact", head: true })
-          .eq("storefront_id", sfId);
-        
-        if (count && count > 0) {
-          setAlreadyScanned(true);
-          setExistingCount(count);
-          return;
-        }
-      }
 
       const runId = runIdRef.current;
 
