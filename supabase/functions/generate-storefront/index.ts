@@ -8,9 +8,9 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not set" }), {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not set" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
@@ -86,48 +86,61 @@ Deno.serve(async (req) => {
       // STEP 2: Catalogue analysis — agent decides section structure
       await send({ step: 2, message: "→ Analysing catalogue structure..." });
 
-      const analysisRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const analysisRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 1024,
+          model: "google/gemini-2.0-flash-001",
+          messages: [
+            {
+              role: "system",
+              content: `You are an Answer Engine Optimisation specialist. Structure an e-commerce catalogue for AI shopping agents. Categories with 3+ products get their own section. Smaller ones are grouped. Section headers must be natural language query patterns buyers would type (e.g. "## Best Swedish cookies for gifting"). Be specific to the store's actual products. You MUST respond using the decide_structure tool.`
+            },
+            {
+              role: "user",
+              content: `Store: ${profile?.store_name || "Unknown"}\nURL: ${profile?.store_url || ""}\nIntent: ${JSON.stringify(profile?.merchandising_intent || {})}\n\nCatalogue:\n${catalogueSummary}`
+            }
+          ],
           tools: [{
-            name: "decide_structure",
-            input_schema: {
-              type: "object",
-              properties: {
-                sections: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      type: { type: "string", enum: ["own_section", "grouped"] },
-                      categories: { type: "array", items: { type: "string" } },
-                      section_header: { type: "string" },
-                      reason: { type: "string" }
-                    },
-                    required: ["type", "categories", "section_header"]
-                  }
+            type: "function",
+            function: {
+              name: "decide_structure",
+              description: "Decide section structure for the storefront",
+              parameters: {
+                type: "object",
+                properties: {
+                  sections: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        type: { type: "string", enum: ["own_section", "grouped"] },
+                        categories: { type: "array", items: { type: "string" } },
+                        section_header: { type: "string" },
+                        reason: { type: "string" }
+                      },
+                      required: ["type", "categories", "section_header"]
+                    }
+                  },
+                  store_intro: { type: "string" },
+                  query_hooks: { type: "array", items: { type: "string" } }
                 },
-                store_intro: { type: "string" },
-                query_hooks: { type: "array", items: { type: "string" } }
-              },
-              required: ["sections", "store_intro", "query_hooks"]
+                required: ["sections", "store_intro", "query_hooks"]
+              }
             }
           }],
-          tool_choice: { type: "tool", name: "decide_structure" },
-          system: `You are an Answer Engine Optimisation specialist. Structure an e-commerce catalogue for AI shopping agents. Categories with 3+ products get their own section. Smaller ones are grouped. Section headers must be natural language query patterns buyers would type (e.g. "## Best Swedish cookies for gifting"). Be specific to the store's actual products.`,
-          messages: [{
-            role: "user",
-            content: `Store: ${profile?.store_name || "Unknown"}\nURL: ${profile?.store_url || ""}\nIntent: ${JSON.stringify(profile?.merchandising_intent || {})}\n\nCatalogue:\n${catalogueSummary}`
-          }]
+          tool_choice: { type: "function", function: { name: "decide_structure" } },
         })
       });
 
       const analysisData = await analysisRes.json();
-      const structureBlock = analysisData.content?.find((b: any) => b.type === "tool_use");
-      const structure = structureBlock?.input || { sections: [], store_intro: "", query_hooks: [] };
+      const analysisToolCall = analysisData.choices?.[0]?.message?.tool_calls?.[0];
+      const structure = analysisToolCall?.function?.arguments
+        ? JSON.parse(analysisToolCall.function.arguments)
+        : { sections: [], store_intro: "", query_hooks: [] };
 
       for (const s of structure.sections) {
         const msg = s.type === "own_section"
@@ -144,48 +157,61 @@ Deno.serve(async (req) => {
       for (let i = 0; i < included.length; i += BATCH_SIZE) {
         const batch = included.slice(i, i + BATCH_SIZE);
         const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-        await send({ step: 3, message: `→ Enriching batch ${batchNum}/${totalBatches} with Claude...` });
+        await send({ step: 3, message: `→ Enriching batch ${batchNum}/${totalBatches} with Gemini...` });
 
-        const enrichRes = await fetch("https://api.anthropic.com/v1/messages", {
+        const enrichRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
-          headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 2048,
+            model: "google/gemini-2.0-flash-001",
+            messages: [
+              {
+                role: "system",
+                content: `You are a product copywriter for AI agent optimisation. Enrich product descriptions so AI shopping agents cite them for relevant queries. Only use data provided. Do not invent attributes. Use specific buyer vocabulary. If agent_notes exist, incorporate them. 2-3 sentences per product. You MUST respond using the enrich_products tool.`
+              },
+              {
+                role: "user",
+                content: `Store: ${profile?.store_name || ""}. Enrich:\n${JSON.stringify(batch.map(p => ({ title: p.title, price: p.price, currency: p.currency, category: p.category, availability: p.availability, tags: p.tags, url: p.url, agent_notes: p.agent_notes })), null, 2)}`
+              }
+            ],
             tools: [{
-              name: "enrich_products",
-              input_schema: {
-                type: "object",
-                properties: {
-                  enriched: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        url: { type: "string" },
-                        enriched_description: { type: "string" },
-                        semantic_tags: { type: "array", items: { type: "string" } },
-                        use_cases: { type: "array", items: { type: "string" } }
-                      },
-                      required: ["url", "enriched_description", "semantic_tags"]
+              type: "function",
+              function: {
+                name: "enrich_products",
+                description: "Enrich product data for AI agent consumption",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    enriched: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          url: { type: "string" },
+                          enriched_description: { type: "string" },
+                          semantic_tags: { type: "array", items: { type: "string" } },
+                          use_cases: { type: "array", items: { type: "string" } }
+                        },
+                        required: ["url", "enriched_description", "semantic_tags"]
+                      }
                     }
-                  }
-                },
-                required: ["enriched"]
+                  },
+                  required: ["enriched"]
+                }
               }
             }],
-            tool_choice: { type: "tool", name: "enrich_products" },
-            system: `You are a product copywriter for AI agent optimisation. Enrich product descriptions so AI shopping agents cite them for relevant queries. Only use data provided. Do not invent attributes. Use specific buyer vocabulary. If agent_notes exist, incorporate them. 2-3 sentences per product.`,
-            messages: [{
-              role: "user",
-              content: `Store: ${profile?.store_name || ""}. Enrich:\n${JSON.stringify(batch.map(p => ({ title: p.title, price: p.price, currency: p.currency, category: p.category, availability: p.availability, tags: p.tags, url: p.url, agent_notes: p.agent_notes })), null, 2)}`
-            }]
+            tool_choice: { type: "function", function: { name: "enrich_products" } },
           })
         });
 
         const enrichData = await enrichRes.json();
-        const enrichBlock = enrichData.content?.find((b: any) => b.type === "tool_use");
-        const enriched = enrichBlock?.input?.enriched || [];
+        const enrichToolCall = enrichData.choices?.[0]?.message?.tool_calls?.[0];
+        const enriched = enrichToolCall?.function?.arguments
+          ? JSON.parse(enrichToolCall.function.arguments).enriched || []
+          : [];
 
         for (const p of batch) {
           const e = enriched.find((x: any) => x.url === p.url) || {};
