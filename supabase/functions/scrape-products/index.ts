@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
 
     let totalExtracted = 0;
     const allCategories: Set<string> = new Set();
-    const aiBatchSize = 2;
+    const aiBatchSize = 10;
 
     for (let i = 0; i < scrapedPages.length; i += aiBatchSize) {
       const batch = scrapedPages.slice(i, i + aiBatchSize);
@@ -230,29 +230,37 @@ Deno.serve(async (req) => {
         .join("\n\n");
 
       try {
-      const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-      if (!ANTHROPIC_API_KEY) {
-        console.error("ANTHROPIC_API_KEY not set");
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        console.error("LOVABLE_API_KEY not set");
         continue;
       }
 
-      let aiRes: Response | null = null;
-      const maxRetries = 3;
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 4096,
-            tools: [{
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            {
+              role: "system",
+              content: `You are a product data extractor. Extract structured product data from e-commerce page markdown.
+Only extract fields you are confident about — uncertain fields should be omitted entirely, never guessed.
+Parse prices carefully: 100kr = 100 SEK, 14,95 = 14.95. Return as number.
+If a product has variants (sizes, colours), return ONE parent product with a variants array.
+Skip navigation, footer, about pages. Return empty array if no products found.`
+            },
+            { role: "user", content: `Extract all products from these pages:\n\n${pagesText}` }
+          ],
+          tools: [{
+            type: "function",
+            function: {
               name: "extract_products",
               description: "Extract structured product data from scraped markdown pages",
-              input_schema: {
+              parameters: {
                 type: "object",
                 properties: {
                   products: {
@@ -287,35 +295,27 @@ Deno.serve(async (req) => {
                 },
                 required: ["products"]
               }
-            }],
-            tool_choice: { type: "tool", name: "extract_products" },
-            system: `You are a product data extractor. Extract structured product data from e-commerce page markdown.
-Only extract fields you are confident about — uncertain fields should be omitted entirely, never guessed.
-Parse prices carefully: 100kr = 100 SEK, 14,95 = 14.95. Return as number.
-If a product has variants (sizes, colours), return ONE parent product with a variants array.
-Skip navigation, footer, about pages. Return empty array if no products found.`,
-            messages: [{ role: "user", content: `Extract all products from these pages:\n\n${pagesText}` }]
-          })
-        });
+            }
+          }],
+          tool_choice: { type: "function", function: { name: "extract_products" } },
+        })
+      });
 
+      if (!aiRes.ok) {
+        const errText = await aiRes.text();
+        console.error(`AI extraction failed (${aiRes.status}):`, errText.substring(0, 200));
         if (aiRes.status === 429) {
-          const waitSec = Math.pow(2, attempt + 1) * 15; // 30s, 60s, 120s
-          console.log(`Rate limited, waiting ${waitSec}s before retry ${attempt + 1}/${maxRetries}`);
-          await new Promise(r => setTimeout(r, waitSec * 1000));
-          continue;
+          console.log("Rate limited, waiting 5s...");
+          await new Promise(r => setTimeout(r, 5000));
         }
-        break;
-      }
-
-      if (!aiRes || !aiRes.ok) {
-        const errText = aiRes ? await aiRes.text() : "No response";
-        console.error("Anthropic extraction failed:", errText.substring(0, 200));
         continue;
       }
 
       const aiData = await aiRes.json();
-      const toolUseBlock = aiData.content?.find((b: any) => b.type === "tool_use");
-      const rawProducts = toolUseBlock?.input?.products || [];
+      const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+      const rawProducts = toolCall?.function?.arguments
+        ? JSON.parse(toolCall.function.arguments).products || []
+        : [];
 
       // Validation gate — deterministic, no LLM
       const parsed = { products: rawProducts.filter((p: any) => {
@@ -359,11 +359,6 @@ Skip navigation, footer, about pages. Return empty array if no products found.`,
       }
 
       console.log(`AI batch ${Math.floor(i / aiBatchSize) + 1}: ${totalExtracted} products saved so far`);
-
-      // Delay between AI batches to respect rate limits (10k tokens/min)
-      if (i + aiBatchSize < scrapedPages.length) {
-        await new Promise(r => setTimeout(r, 15000));
-      }
     }
 
     console.log(`Extracted ${totalExtracted} products`);
