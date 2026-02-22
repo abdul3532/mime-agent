@@ -160,7 +160,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       </div>
 
       {/* Progress bar */}
-      {!done && !error && !needsAuth && (
+      {!done && !error && !needsAuth && !alreadyScanned && (
         <div className="space-y-2">
           <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
             <div className="progress-fill h-full rounded-full transition-all duration-700 ease-out" style={{
@@ -174,24 +174,26 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       )}
 
       {/* Stage stepper */}
-      <div className="space-y-2">
-        {stages.map((s, i) => (
-          <div key={s} className="flex items-center gap-3 text-sm">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-              i < stage || done ? "bg-accent text-accent-foreground" :
-              i === stage && !done && !error && !needsAuth ? "bg-primary text-primary-foreground animate-pulse" :
-              "bg-muted text-muted-foreground"
-            }`}>
-              {i < stage || done ? "✓" : i + 1}
+      {!alreadyScanned && (
+        <div className="space-y-2">
+          {stages.map((s, i) => (
+            <div key={s} className="flex items-center gap-3 text-sm">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                i < stage || done ? "bg-accent text-accent-foreground" :
+                i === stage && !done && !error && !needsAuth ? "bg-primary text-primary-foreground animate-pulse" :
+                "bg-muted text-muted-foreground"
+              }`}>
+                {i < stage || done ? "✓" : i + 1}
+              </div>
+              <span className={i <= stage || done ? "text-foreground" : "text-muted-foreground"}>
+                {s}
+                {i === 1 && stage === 1 && progress?.total_urls ? ` (${progress.scraped_pages}/${progress.total_urls})` : ""}
+                {i === 2 && stage === 2 && progress?.extracted_products ? ` (${progress.extracted_products} products)` : ""}
+              </span>
             </div>
-            <span className={i <= stage || done ? "text-foreground" : "text-muted-foreground"}>
-              {s}
-              {i === 1 && stage === 1 && progress?.total_urls ? ` (${progress.scraped_pages}/${progress.total_urls})` : ""}
-              {i === 2 && stage === 2 && progress?.extracted_products ? ` (${progress.extracted_products} products)` : ""}
-            </span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Already scanned state */}
       {alreadyScanned && (
@@ -285,7 +287,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       )}
 
       {/* Loading indicator */}
-      {!done && !error && !needsAuth && !progress && (
+      {!done && !error && !needsAuth && !alreadyScanned && !progress && (
         <p className="text-xs text-muted-foreground animate-pulse">Connecting to scraping service...</p>
       )}
     </motion.div>
