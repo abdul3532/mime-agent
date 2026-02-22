@@ -45,12 +45,15 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       setAlreadyScanned(false);
       setProgress(null);
 
-      // Check if user already has products from this URL
-      if (user) {
+      // Check if user already has products from this specific store URL
+      if (user && storeUrl) {
+        // Normalize the URL for matching (strip protocol and trailing slash)
+        const normalizedUrl = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
         const { count } = await supabase
           .from("products")
           .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .ilike("url", `%${normalizedUrl}%`);
         
         if (count && count > 0) {
           setAlreadyScanned(true);

@@ -216,8 +216,15 @@ Deno.serve(async (req) => {
     await updateProgress({ status: "extracting" });
     console.log("Step 3: Extracting product data with AI...");
 
-    // Delete existing products upfront so incremental inserts work
-    await adminClient.from("products").delete().eq("user_id", userId);
+    // Delete existing products from this specific domain so incremental inserts work
+    // Extract domain from the URL to scope deletion
+    const urlObj = new URL(formattedUrl);
+    const domain = urlObj.hostname;
+    await adminClient
+      .from("products")
+      .delete()
+      .eq("user_id", userId)
+      .ilike("url", `%${domain}%`);
 
     let totalExtracted = 0;
     const allCategories: Set<string> = new Set();
