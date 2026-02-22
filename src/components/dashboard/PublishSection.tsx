@@ -19,7 +19,12 @@ export function PublishSection({ storeId }: Props) {
   const { products, rules, saveProducts, saveRules, storefront } = useDashboard();
   const [domain, setDomain] = useState("");
   const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState<boolean | null>(null);
+  const [verifyResult, setVerifyResult] = useState<{
+    endpoint_reachable: boolean;
+    snippet_detected: boolean;
+    llms_snippet_detected: boolean;
+    fetch_error: string | null;
+  } | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -56,12 +61,25 @@ export function PublishSection({ storeId }: Props) {
     toast({ title: "Copied", description: `${label} copied.` });
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
+    const verifyUrl = domain || storefront?.store_url;
+    if (!verifyUrl) {
+      toast({ title: "Enter a domain", description: "Please enter your site URL to verify.", variant: "destructive" });
+      return;
+    }
     setVerifying(true);
-    setTimeout(() => {
+    setVerifyResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-installation", {
+        body: { url: verifyUrl.startsWith("http") ? verifyUrl : `https://${verifyUrl}`, store_id: storefront?.store_id || storeId },
+      });
+      if (error) throw error;
+      setVerifyResult(data);
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Verification failed", variant: "destructive" });
+    } finally {
       setVerifying(false);
-      setVerified(domain.length > 3);
-    }, 2000);
+    }
   };
 
   const handleSaveAll = async () => {
@@ -222,18 +240,27 @@ export function PublishSection({ storeId }: Props) {
       {/* Verify */}
       <div className="card-elevated p-5 space-y-4">
         <h3 className="text-sm font-semibold">Verify installation</h3>
-        <Input placeholder="Your domain (optional)" value={domain} onChange={(e) => setDomain(e.target.value)} />
+        <Input placeholder="Your site URL (e.g. https://example.com)" value={domain} onChange={(e) => setDomain(e.target.value)} />
         <Button onClick={handleVerify} variant="outline" className="w-full" disabled={verifying}>
           {verifying ? "Verifying..." : "Verify"}
         </Button>
-        {verified === true && (
-          <div className="flex items-center gap-2 text-sm font-medium text-primary">
-            <CheckCircle2 className="h-4 w-4" /> Installation verified — agents can discover your store.
-          </div>
-        )}
-        {verified === false && (
-          <div className="flex items-center gap-2 text-sm text-destructive font-medium">
-            <XCircle className="h-4 w-4" /> Not detected — add the link tag and try again.
+        {verifyResult && (
+          <div className="space-y-2 text-sm">
+            <div className={`flex items-center gap-2 font-medium ${verifyResult.endpoint_reachable ? "text-primary" : "text-destructive"}`}>
+              {verifyResult.endpoint_reachable ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {verifyResult.endpoint_reachable ? "MIME endpoint reachable" : "MIME endpoint not reachable"}
+            </div>
+            <div className={`flex items-center gap-2 font-medium ${verifyResult.snippet_detected ? "text-primary" : "text-destructive"}`}>
+              {verifyResult.snippet_detected ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {verifyResult.snippet_detected ? "Agent JSON link detected" : "Agent JSON link not detected — add the tag and try again"}
+            </div>
+            <div className={`flex items-center gap-2 font-medium ${verifyResult.llms_snippet_detected ? "text-primary" : "text-muted-foreground"}`}>
+              {verifyResult.llms_snippet_detected ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {verifyResult.llms_snippet_detected ? "llms.txt link detected" : "llms.txt link not detected (optional)"}
+            </div>
+            {verifyResult.fetch_error && (
+              <p className="text-xs text-muted-foreground">{verifyResult.fetch_error}</p>
+            )}
           </div>
         )}
       </div>

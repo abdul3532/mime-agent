@@ -1,19 +1,25 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Plug, Copy, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { Plug, Copy, CheckCircle2, XCircle, ExternalLink, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   storeId: string;
+  storeUrl?: string;
 }
 
-export function StepInstall({ storeId }: Props) {
+export function StepInstall({ storeId, storeUrl }: Props) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState<boolean | null>(null);
+  const [verifyResult, setVerifyResult] = useState<{
+    endpoint_reachable: boolean;
+    snippet_detected: boolean;
+    fetch_error: string | null;
+  } | null>(null);
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "paijyobnnrcidapjqcln";
   const endpoint = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${storeId}`;
@@ -25,13 +31,24 @@ export function StepInstall({ storeId }: Props) {
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
+    if (!storeUrl) {
+      toast({ title: "No URL", description: "Store URL is not available.", variant: "destructive" });
+      return;
+    }
     setVerifying(true);
-    setTimeout(() => {
+    setVerifyResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-installation", {
+        body: { url: storeUrl, store_id: storeId },
+      });
+      if (error) throw error;
+      setVerifyResult(data);
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Verification failed", variant: "destructive" });
+    } finally {
       setVerifying(false);
-      // Simulate: endpoint reachable, link not yet detected
-      setVerified(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -90,20 +107,19 @@ export function StepInstall({ storeId }: Props) {
           {verifying ? "Checking..." : "Verify installation"}
         </Button>
 
-        {verified === false && (
+        {verifyResult && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle2 className="h-4 w-4" /> MIME endpoint reachable
+            <div className={`flex items-center gap-2 ${verifyResult.endpoint_reachable ? "text-accent-foreground" : "text-destructive"}`}>
+              {verifyResult.endpoint_reachable ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {verifyResult.endpoint_reachable ? "MIME endpoint reachable" : "MIME endpoint not reachable"}
             </div>
-            <div className="flex items-center gap-2 text-destructive">
-              <XCircle className="h-4 w-4" /> Link snippet not detected — add the tag and try again
+            <div className={`flex items-center gap-2 ${verifyResult.snippet_detected ? "text-accent-foreground" : "text-destructive"}`}>
+              {verifyResult.snippet_detected ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {verifyResult.snippet_detected ? "Link snippet detected — agents can discover your storefront." : "Link snippet not detected — add the tag and try again."}
             </div>
-          </motion.div>
-        )}
-
-        {verified === true && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-sm text-green-600 font-medium">
-            <CheckCircle2 className="h-4 w-4" /> Installed successfully — agents can discover your storefront.
+            {verifyResult.fetch_error && (
+              <p className="text-xs text-muted-foreground">{verifyResult.fetch_error}</p>
+            )}
           </motion.div>
         )}
       </div>
