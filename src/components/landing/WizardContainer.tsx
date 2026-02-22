@@ -51,13 +51,17 @@ export function WizardContainer() {
     }
   };
 
+  // Clear stale wizard state on mount
   useEffect(() => {
-    localStorage.setItem("mime_wizard_step", currentStep.toString());
+    localStorage.removeItem("mime_wizard_step");
+    localStorage.removeItem("mime_store_url");
+  }, []);
+
+  useEffect(() => {
     if (storeUrl) {
       localStorage.setItem("mime_store_id", storeId);
-      localStorage.setItem("mime_store_url", storeUrl);
     }
-  }, [storeUrl, storeId, currentStep]);
+  }, [storeUrl, storeId]);
 
   return (
     <section id="wizard" className="py-20 md:py-28 relative">
