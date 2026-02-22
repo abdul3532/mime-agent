@@ -68,19 +68,17 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
         sfId = existingSf.id;
         // Delete existing products for this storefront so we crawl fresh
         await supabase.from("products").delete().eq("storefront_id", sfId);
-        // Also clean up old scrape progress
-        await supabase.from("scrape_progress").delete().eq("storefront_id", sfId);
       } else {
-        // Create new storefront using upsert to handle race conditions
+        // Create new storefront
         const { data: newSf, error: sfErr } = await supabase
           .from("storefronts")
-          .upsert({
+          .insert({
             user_id: user.id,
             store_id: storeId,
             store_url: storeUrl,
             domain: cleanDomain,
             store_name: cleanDomain,
-          }, { onConflict: "store_id" })
+          })
           .select("id")
           .single();
 
