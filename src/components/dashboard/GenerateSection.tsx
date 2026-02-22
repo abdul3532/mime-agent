@@ -202,7 +202,7 @@ export function GenerateSection() {
 
   const llmsUrl = `${functionsBase}/serve-llms?store_id=${storeId}&file=llms`;
   const llmsFullUrl = `${functionsBase}/serve-llms?store_id=${storeId}&file=llms-full`;
-  const snippet = `<link rel="alternate" type="text/plain" title="llms.txt" href="${llmsUrl}" />`;
+  const snippet = `<link rel="alternate" type="text/markdown" href="${llmsUrl}" title="AI-optimised product catalogue">`;
 
   // --- STATE 2: GENERATING ---
   if (state === "generating") {
