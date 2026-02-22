@@ -42,18 +42,24 @@ function generateStoreId(domain: string): string {
   return `${slug}-${suffix}`;
 }
 
-export function GenerateSection() {
+interface GenerateSectionProps {
+  storeId?: string;
+}
+
+export function GenerateSection({ storeId: propStoreId }: GenerateSectionProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { products, rules } = useDashboard();
 
   const [state, setState] = useState<GenerateState>("idle");
-  const [storeId, setStoreId] = useState<string | null>(null);
+  const [localStoreId, setLocalStoreId] = useState<string | null>(null);
   const [lastFile, setLastFile] = useState<StorefrontFile | null>(null);
   const [streamLines, setStreamLines] = useState<string[]>([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  const resolvedStoreId = propStoreId || localStoreId;
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "paijyobnnrcidapjqcln";
   const functionsBase = `https://${projectId}.supabase.co/functions/v1`;
@@ -74,12 +80,12 @@ export function GenerateSection() {
 
       if (profile) {
         if (profile.store_id) {
-          setStoreId(profile.store_id);
+          setLocalStoreId(profile.store_id);
         } else {
           const domain = profile.domain || profile.store_url || user.email || "store";
           const newId = generateStoreId(domain);
           await supabase.from("profiles").update({ store_id: newId } as any).eq("user_id", user.id);
-          setStoreId(newId);
+          setLocalStoreId(newId);
         }
       }
 
@@ -104,7 +110,7 @@ export function GenerateSection() {
   }, [streamLines]);
 
   const handleGenerate = useCallback(async () => {
-    if (!user || !storeId) return;
+    if (!user || !resolvedStoreId) return;
     setState("generating");
     setStreamLines([]);
     setStepIndex(0);
@@ -193,15 +199,15 @@ export function GenerateSection() {
       toast({ title: "Error", description: "Generation failed. Please try again.", variant: "destructive" });
       setState("idle");
     }
-  }, [user, storeId, functionsBase, toast]);
+  }, [user, resolvedStoreId, functionsBase, toast]);
 
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied", description: `${label} copied to clipboard.` });
   };
 
-  const llmsUrl = `${functionsBase}/serve-llms?store_id=${storeId}&file=llms`;
-  const llmsFullUrl = `${functionsBase}/serve-llms?store_id=${storeId}&file=llms-full`;
+  const llmsUrl = `${functionsBase}/serve-llms?store_id=${resolvedStoreId}&file=llms`;
+  const llmsFullUrl = `${functionsBase}/serve-llms?store_id=${resolvedStoreId}&file=llms-full`;
   const snippet = `<link rel="alternate" type="text/markdown" href="${llmsUrl}" title="AI-optimised product catalogue">`;
 
   // --- STATE 2: GENERATING ---

@@ -227,7 +227,7 @@ function DashboardInner() {
               {activeTab === "agent-analytics" && <AgentAnalyticsSection />}
               {activeTab === "products" && <ProductsSection />}
               {activeTab === "rules" && <RulesSection />}
-              {activeTab === "generate" && <GenerateSection />}
+              {activeTab === "generate" && <GenerateSection storeId={storeId} />}
               {activeTab === "preview" && <PreviewSection storeId={storeId} />}
               {activeTab === "publish" && <PublishSection storeId={storeId} />}
             </motion.div>
