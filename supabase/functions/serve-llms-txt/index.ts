@@ -11,6 +11,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== "GET") {
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "text/plain" },
+    });
+  }
+
   try {
     const url = new URL(req.url);
     const storeId = url.searchParams.get("store_id");
@@ -28,11 +35,19 @@ Deno.serve(async (req) => {
     );
 
     // Resolve store_id to user_id via profiles
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("user_id")
       .eq("store_id", storeId)
-      .single();
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Profile lookup failed:", profileError.message);
+      return new Response("Internal server error", {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "text/plain" },
+      });
+    }
 
     if (!profile) {
       return new Response("Store not found", {
@@ -41,11 +56,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: sf } = await supabase
+    const { data: sf, error: storefrontError } = await supabase
       .from("storefront_files")
       .select("llms_txt")
       .eq("user_id", profile.user_id)
-      .single();
+      .maybeSingle();
+
+    if (storefrontError) {
+      console.error("Storefront lookup failed:", storefrontError.message);
+      return new Response("Internal server error", {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "text/plain" },
+      });
+    }
 
     if (!sf?.llms_txt) {
       return new Response("llms.txt not generated yet", {
