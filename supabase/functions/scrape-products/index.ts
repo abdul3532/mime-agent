@@ -57,11 +57,18 @@ Deno.serve(async (req) => {
     userId = user.id;
 
     const body = await req.json();
-    const { url } = body;
+    const { url, storefrontId } = body;
     runId = body.runId || crypto.randomUUID();
 
     if (!url) {
       return new Response(JSON.stringify({ error: "URL is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!storefrontId) {
+      return new Response(JSON.stringify({ error: "storefrontId is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -88,10 +95,11 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    // Create progress row
+    // Create progress row with storefront_id
     await adminClient.from("scrape_progress").insert({
       user_id: userId,
       run_id: runId,
+      storefront_id: storefrontId,
       status: "mapping",
       total_urls: 0,
       scraped_pages: 0,
@@ -223,15 +231,11 @@ Deno.serve(async (req) => {
     await updateProgress({ status: "extracting" });
     console.log("Step 3: Extracting product data with AI...");
 
-    // Delete existing products from this specific domain so incremental inserts work
-    // Extract domain from the URL to scope deletion
-    const urlObj = new URL(formattedUrl);
-    const domain = urlObj.hostname;
+    // Delete existing products for this storefront
     await adminClient
       .from("products")
       .delete()
-      .eq("user_id", userId)
-      .ilike("url", `%${domain}%`);
+      .eq("storefront_id", storefrontId);
 
     let totalExtracted = 0;
     const allCategories: Set<string> = new Set();
@@ -332,9 +336,10 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
         if (toolCall?.function?.arguments) {
           const parsed = JSON.parse(toolCall.function.arguments);
           if (Array.isArray(parsed.products) && parsed.products.length > 0) {
-            // Incremental save — insert immediately
+            // Incremental save — insert immediately with storefront_id
             const rows = parsed.products.map((p: any) => ({
               user_id: userId,
+              storefront_id: storefrontId,
               title: p.title || "Untitled Product",
               price: p.price || 0,
               currency: p.currency || "EUR",
@@ -385,7 +390,7 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
             Authorization: authHeader!,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ storefrontId }),
         }
       );
       if (generateRes.ok) {

@@ -35,35 +35,53 @@ Deno.serve(async (req) => {
     }
     const userId = user.id;
 
-    // Load profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("store_name, domain, store_url, store_id")
-      .eq("user_id", userId)
-      .single();
+    const body = await req.json().catch(() => ({}));
+    let { storefrontId } = body;
 
-    let storeId = profile?.store_id;
-    if (!storeId) {
-      // Auto-generate store_id from user id
-      storeId = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-      const { error: updateErr } = await supabase
-        .from("profiles")
-        .update({ store_id: storeId })
-        .eq("user_id", userId);
-      if (updateErr) {
-        console.error("Failed to set store_id:", updateErr.message);
-        return new Response(JSON.stringify({ error: "Failed to configure store" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // If no storefrontId provided, find the user's first storefront
+    if (!storefrontId) {
+      const { data: sf } = await serviceClient
+        .from("storefronts")
+        .select("id")
+        .eq("user_id", userId)
+        .limit(1)
+        .single();
+      if (sf) storefrontId = sf.id;
     }
 
-    // Load products for category summary
-    const { data: products } = await supabase
+    if (!storefrontId) {
+      return new Response(JSON.stringify({ error: "No storefront found" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Load storefront metadata
+    const { data: storefront } = await serviceClient
+      .from("storefronts")
+      .select("store_id, store_name, store_url, domain")
+      .eq("id", storefrontId)
+      .single();
+
+    if (!storefront) {
+      return new Response(JSON.stringify({ error: "Storefront not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const storeId = storefront.store_id;
+
+    // Load products for this storefront
+    const { data: products } = await serviceClient
       .from("products")
       .select("category, availability, title, tags")
-      .eq("user_id", userId);
+      .eq("storefront_id", storefrontId);
 
     const categoryCounts: Record<string, number> = {};
     const allTags = new Set<string>();
@@ -75,8 +93,8 @@ Deno.serve(async (req) => {
     const projectId = Deno.env.get("SUPABASE_URL")!.match(/\/\/([^.]+)/)?.[1] || "";
     const jsonFeedUrl = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${storeId}`;
     const llmsTxtUrl = `https://${projectId}.supabase.co/functions/v1/serve-llms-txt?store_id=${storeId}`;
-    const storeName = profile.store_name || profile.domain || "My Store";
-    const domain = profile.domain || profile.store_url || "";
+    const storeName = storefront.store_name || storefront.domain || "My Store";
+    const domain = storefront.domain || storefront.store_url || "";
     const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
     const categoryList = Object.entries(categoryCounts)
@@ -187,18 +205,14 @@ RULES:
     // Strip any accidental code fences
     llmsTxt = llmsTxt.replace(/^```[a-z]*\n?/gm, "").replace(/```$/gm, "").trim();
 
-    // Upsert into storefront_files
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
+    // Upsert into storefront_files with storefront_id
     const { error: upsertErr } = await serviceClient
       .from("storefront_files")
       .upsert(
         {
           user_id: userId,
           store_id: storeId,
+          storefront_id: storefrontId,
           llms_txt: llmsTxt,
           product_count: products?.length || 0,
           section_count: Object.keys(categoryCounts).length,

@@ -14,6 +14,15 @@ export interface Rule {
   amount: number;
 }
 
+export interface Storefront {
+  id: string;
+  store_id: string;
+  store_name: string | null;
+  store_url: string | null;
+  domain: string | null;
+  store_logo_url: string | null;
+}
+
 interface DashboardContextType {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
@@ -40,6 +49,9 @@ interface DashboardContextType {
   deleteStoreData: () => Promise<void>;
   deleting: boolean;
   rawSamples: any[] | null;
+  storefront: Storefront | null;
+  storefronts: Storefront[];
+  setActiveStorefront: (id: string) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -58,42 +70,92 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [seeding, setSeeding] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [rawSamples, setRawSamples] = useState<any[] | null>(null);
+  const [storefronts, setStorefronts] = useState<Storefront[]>([]);
+  const [storefront, setStorefront] = useState<Storefront | null>(null);
 
-  // Load products from DB
+  const setActiveStorefront = useCallback((id: string) => {
+    const sf = storefronts.find((s) => s.id === id);
+    if (sf) {
+      setStorefront(sf);
+      localStorage.setItem("mime_active_storefront_id", id);
+    }
+  }, [storefronts]);
+
+  // Load storefronts and data
   useEffect(() => {
     if (!user) {
-      // No user: empty state, no mock data
       setProducts([]);
+      setStorefronts([]);
+      setStorefront(null);
       setLoading(false);
       return;
     }
     const loadData = async () => {
       setLoading(true);
-      const { data: dbProducts } = await supabase
-        .from("products")
-        .select("*")
+
+      // Load storefronts
+      const { data: sfs } = await supabase
+        .from("storefronts")
+        .select("id, store_id, store_name, store_url, domain, store_logo_url")
         .eq("user_id", user.id)
         .order("created_at");
 
-      if (dbProducts) {
-        setProducts(dbProducts.map((p) => ({
-          id: p.id,
-          title: p.title,
-          price: Number(p.price),
-          currency: p.currency,
-          availability: p.availability as Product["availability"],
-          category: p.category,
-          tags: p.tags || [],
-          margin: 0,
-          inventory: p.inventory,
-          url: p.url || "",
-          image: p.image || "",
-          boostScore: p.boost_score,
-          included: p.included,
-        })));
-        if (dbProducts.length > 0) {
-          const latest = dbProducts.reduce((a, b) => a.created_at > b.created_at ? a : b);
-          setLastScannedAt(new Date(latest.created_at));
+      const storefrontList: Storefront[] = (sfs || []).map((s: any) => ({
+        id: s.id,
+        store_id: s.store_id,
+        store_name: s.store_name,
+        store_url: s.store_url,
+        domain: s.domain,
+        store_logo_url: s.store_logo_url,
+      }));
+      setStorefronts(storefrontList);
+
+      // Pick active storefront
+      const savedId = localStorage.getItem("mime_active_storefront_id");
+      const activeSf = storefrontList.find((s) => s.id === savedId) || storefrontList[0] || null;
+      setStorefront(activeSf);
+
+      if (!activeSf) {
+        // No storefront yet — load products by user_id as fallback
+        const { data: dbProducts } = await supabase
+          .from("products")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at");
+
+        if (dbProducts) {
+          setProducts(dbProducts.map((p) => ({
+            id: p.id, title: p.title, price: Number(p.price), currency: p.currency,
+            availability: p.availability as Product["availability"], category: p.category,
+            tags: p.tags || [], margin: 0, inventory: p.inventory,
+            url: p.url || "", image: p.image || "",
+            boostScore: p.boost_score, included: p.included,
+          })));
+          if (dbProducts.length > 0) {
+            const latest = dbProducts.reduce((a, b) => a.created_at > b.created_at ? a : b);
+            setLastScannedAt(new Date(latest.created_at));
+          }
+        }
+      } else {
+        // Load products for the active storefront
+        const { data: dbProducts } = await supabase
+          .from("products")
+          .select("*")
+          .eq("storefront_id", activeSf.id)
+          .order("created_at");
+
+        if (dbProducts) {
+          setProducts(dbProducts.map((p) => ({
+            id: p.id, title: p.title, price: Number(p.price), currency: p.currency,
+            availability: p.availability as Product["availability"], category: p.category,
+            tags: p.tags || [], margin: 0, inventory: p.inventory,
+            url: p.url || "", image: p.image || "",
+            boostScore: p.boost_score, included: p.included,
+          })));
+          if (dbProducts.length > 0) {
+            const latest = dbProducts.reduce((a, b) => a.created_at > b.created_at ? a : b);
+            setLastScannedAt(new Date(latest.created_at));
+          }
         }
       }
 
@@ -122,6 +184,29 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     loadData();
   }, [user]);
 
+  // Reload when active storefront changes
+  useEffect(() => {
+    if (!user || !storefront) return;
+    const reload = async () => {
+      const { data: dbProducts } = await supabase
+        .from("products")
+        .select("*")
+        .eq("storefront_id", storefront.id)
+        .order("created_at");
+
+      if (dbProducts) {
+        setProducts(dbProducts.map((p) => ({
+          id: p.id, title: p.title, price: Number(p.price), currency: p.currency,
+          availability: p.availability as Product["availability"], category: p.category,
+          tags: p.tags || [], margin: 0, inventory: p.inventory,
+          url: p.url || "", image: p.image || "",
+          boostScore: p.boost_score, included: p.included,
+        })));
+      }
+    };
+    reload();
+  }, [storefront?.id, user]);
+
   // Debounced auto-save for product changes (boost score, included, tags)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdatesRef = useRef<Map<string, Partial<Product>>>(new Map());
@@ -144,18 +229,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const updateProduct = useCallback((id: string, updates: Partial<Product>) => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-
-    // Queue for auto-save
     const existing = pendingUpdatesRef.current.get(id) || {};
     pendingUpdatesRef.current.set(id, { ...existing, ...updates });
-
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      flushProductUpdates();
-    }, 1500);
+    saveTimerRef.current = setTimeout(() => { flushProductUpdates(); }, 1500);
   }, [flushProductUpdates]);
 
-  // Compute effective score with rules applied
   const computeEffectiveScore = useCallback((p: Product) => {
     const matchingRules: Rule[] = [];
     let delta = 0;
@@ -187,31 +266,24 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const reloadProducts = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data: dbProducts } = await supabase
-      .from("products")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at");
+
+    const query = storefront
+      ? supabase.from("products").select("*").eq("storefront_id", storefront.id).order("created_at")
+      : supabase.from("products").select("*").eq("user_id", user.id).order("created_at");
+
+    const { data: dbProducts } = await query;
 
     if (dbProducts) {
       setProducts(dbProducts.map((p) => ({
-        id: p.id,
-        title: p.title,
-        price: Number(p.price),
-        currency: p.currency,
-        availability: p.availability as Product["availability"],
-        category: p.category,
-        tags: p.tags || [],
-        margin: 0,
-        inventory: p.inventory,
-        url: p.url || "",
-        image: p.image || "",
-        boostScore: p.boost_score,
-        included: p.included,
+        id: p.id, title: p.title, price: Number(p.price), currency: p.currency,
+        availability: p.availability as Product["availability"], category: p.category,
+        tags: p.tags || [], margin: 0, inventory: p.inventory,
+        url: p.url || "", image: p.image || "",
+        boostScore: p.boost_score, included: p.included,
       })));
     }
     setLoading(false);
-  }, [user]);
+  }, [user, storefront]);
 
   const saveProducts = useCallback(async () => {
     if (!user) {
@@ -259,17 +331,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const { mockProducts } = await import("@/data/mockProducts");
       const inserts = mockProducts.map((p) => ({
         user_id: user.id,
-        title: p.title,
-        price: p.price,
-        currency: p.currency,
-        availability: p.availability,
-        category: p.category,
-        tags: p.tags,
-        inventory: p.inventory,
-        url: p.url,
-        image: p.image,
-        boost_score: p.boostScore,
-        included: p.included,
+        storefront_id: storefront?.id || undefined,
+        title: p.title, price: p.price, currency: p.currency,
+        availability: p.availability, category: p.category,
+        tags: p.tags, inventory: p.inventory, url: p.url,
+        image: p.image, boost_score: p.boostScore, included: p.included,
       }));
       await supabase.from("products").insert(inserts);
       await reloadProducts();
@@ -279,13 +345,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     } finally {
       setSeeding(false);
     }
-  }, [user, reloadProducts, toast]);
+  }, [user, storefront, reloadProducts, toast]);
 
   const deleteStoreData = useCallback(async () => {
     if (!user) return;
     setDeleting(true);
     try {
-      await supabase.from("products").delete().eq("user_id", user.id);
+      if (storefront) {
+        await supabase.from("products").delete().eq("storefront_id", storefront.id);
+      } else {
+        await supabase.from("products").delete().eq("user_id", user.id);
+      }
       await supabase.from("rules").delete().eq("user_id", user.id);
       setProducts([]);
       setRules([]);
@@ -297,9 +367,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     } finally {
       setDeleting(false);
     }
-  }, [user, toast]);
+  }, [user, storefront, toast]);
 
-    return (
+  return (
     <DashboardContext.Provider value={{
       products, setProducts, updateProduct,
       rules, setRules,
@@ -313,6 +383,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       computeEffectiveScore,
       deleteStoreData, deleting,
       rawSamples,
+      storefront, storefronts, setActiveStorefront,
     }}>
       {children}
     </DashboardContext.Provider>

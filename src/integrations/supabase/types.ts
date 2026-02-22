@@ -65,6 +65,7 @@ export type Database = {
           included: boolean
           inventory: number
           price: number
+          storefront_id: string | null
           tags: string[] | null
           title: string
           updated_at: string
@@ -84,6 +85,7 @@ export type Database = {
           included?: boolean
           inventory?: number
           price?: number
+          storefront_id?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
@@ -103,6 +105,7 @@ export type Database = {
           included?: boolean
           inventory?: number
           price?: number
+          storefront_id?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string
@@ -110,7 +113,15 @@ export type Database = {
           user_id?: string
           variants?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_storefront_id_fkey"
+            columns: ["storefront_id"]
+            isOneToOne: false
+            referencedRelation: "storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -193,6 +204,7 @@ export type Database = {
           field: string
           id: string
           name: string
+          storefront_id: string | null
           user_id: string
           value: string
         }
@@ -204,6 +216,7 @@ export type Database = {
           field: string
           id?: string
           name: string
+          storefront_id?: string | null
           user_id: string
           value: string
         }
@@ -215,10 +228,19 @@ export type Database = {
           field?: string
           id?: string
           name?: string
+          storefront_id?: string | null
           user_id?: string
           value?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rules_storefront_id_fkey"
+            columns: ["storefront_id"]
+            isOneToOne: false
+            referencedRelation: "storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scrape_progress: {
         Row: {
@@ -230,6 +252,7 @@ export type Database = {
           run_id: string
           scraped_pages: number
           status: string
+          storefront_id: string | null
           total_urls: number
           updated_at: string
           user_id: string
@@ -243,6 +266,7 @@ export type Database = {
           run_id: string
           scraped_pages?: number
           status?: string
+          storefront_id?: string | null
           total_urls?: number
           updated_at?: string
           user_id: string
@@ -256,11 +280,20 @@ export type Database = {
           run_id?: string
           scraped_pages?: number
           status?: string
+          storefront_id?: string | null
           total_urls?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scrape_progress_storefront_id_fkey"
+            columns: ["storefront_id"]
+            isOneToOne: false
+            referencedRelation: "storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       storefront_files: {
         Row: {
@@ -271,6 +304,7 @@ export type Database = {
           product_count: number | null
           section_count: number | null
           store_id: string
+          storefront_id: string | null
           user_id: string
         }
         Insert: {
@@ -281,6 +315,7 @@ export type Database = {
           product_count?: number | null
           section_count?: number | null
           store_id: string
+          storefront_id?: string | null
           user_id: string
         }
         Update: {
@@ -291,6 +326,51 @@ export type Database = {
           product_count?: number | null
           section_count?: number | null
           store_id?: string
+          storefront_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storefront_files_storefront_id_fkey"
+            columns: ["storefront_id"]
+            isOneToOne: false
+            referencedRelation: "storefronts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storefronts: {
+        Row: {
+          created_at: string
+          domain: string | null
+          id: string
+          store_id: string
+          store_logo_url: string | null
+          store_name: string | null
+          store_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          domain?: string | null
+          id?: string
+          store_id: string
+          store_logo_url?: string | null
+          store_name?: string | null
+          store_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string | null
+          id?: string
+          store_id?: string
+          store_logo_url?: string | null
+          store_name?: string | null
+          store_url?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

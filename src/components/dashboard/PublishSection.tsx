@@ -16,7 +16,7 @@ interface Props {
 export function PublishSection({ storeId }: Props) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { products, rules, saveProducts, saveRules } = useDashboard();
+  const { products, rules, saveProducts, saveRules, storefront } = useDashboard();
   const [domain, setDomain] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
@@ -74,7 +74,9 @@ export function PublishSection({ storeId }: Props) {
   const handleGenerateLlms = async () => {
     setGeneratingLlms(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-llms-txt");
+      const { data, error } = await supabase.functions.invoke("generate-llms-txt", {
+        body: { storefrontId: storefront?.id },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setLlmsTxt(data.llms_txt);
@@ -90,15 +92,25 @@ export function PublishSection({ storeId }: Props) {
   // Load existing llms.txt on mount
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("storefront_files")
-      .select("llms_txt")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data }) => {
+    const load = async () => {
+      if (storefront) {
+        const { data } = await supabase
+          .from("storefront_files")
+          .select("llms_txt")
+          .eq("storefront_id", storefront.id)
+          .maybeSingle();
         if (data?.llms_txt) setLlmsTxt(data.llms_txt);
-      });
-  }, [user]);
+      } else {
+        const { data } = await supabase
+          .from("storefront_files")
+          .select("llms_txt")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data?.llms_txt) setLlmsTxt(data.llms_txt);
+      }
+    };
+    load();
+  }, [user, storefront]);
 
   const handlePublish = async () => {
     setConfirmOpen(false);
