@@ -18,11 +18,8 @@ const stepLabels = [
 ];
 
 export function WizardContainer() {
-  const [currentStep, setCurrentStep] = useState(() => {
-    const saved = localStorage.getItem("mime_wizard_step");
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [storeUrl, setStoreUrl] = useState(() => localStorage.getItem("mime_store_url") || "");
+  const [currentStep, setCurrentStep] = useState(0);
+  const [storeUrl, setStoreUrl] = useState("");
   const [storeId] = useState(() => localStorage.getItem("mime_store_id") || `store_${Math.random().toString(36).slice(2, 10)}`);
   const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 

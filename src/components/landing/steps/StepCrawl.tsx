@@ -234,17 +234,23 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           <div className="flex items-center gap-2 text-accent-foreground font-semibold">
             <CheckCircle2 className="h-5 w-5 text-accent" />
-            Products already imported
+            Products already imported ({existingCount})
           </div>
           <p className="text-sm text-muted-foreground">
-            You already have {existingCount} products in your dashboard. You can rescan from the dashboard if you want to update them.
+            You already have {existingCount} products from this store. You can rescan to update them or continue.
           </p>
           <div className="flex gap-3">
-            <Button onClick={() => navigate("/dashboard")} className="flex-1 gap-2">
-              <RefreshCw className="h-4 w-4" /> Go to dashboard
+            <Button variant="outline" onClick={() => {
+              setAlreadyScanned(false);
+              runIdRef.current = crypto.randomUUID();
+            }} className="gap-2">
+              <RefreshCw className="h-4 w-4" /> Rescan
             </Button>
-            <Button variant="outline" onClick={onComplete}>
+            <Button onClick={onComplete} className="flex-1">
               Continue setup
+            </Button>
+            <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+              Dashboard
             </Button>
           </div>
         </motion.div>
