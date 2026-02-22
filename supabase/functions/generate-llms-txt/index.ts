@@ -26,15 +26,14 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
 
     // Load profile
     const { data: profile } = await supabase
@@ -53,18 +52,22 @@ Deno.serve(async (req) => {
     // Load products for category summary
     const { data: products } = await supabase
       .from("products")
-      .select("category, availability")
+      .select("category, availability, title, tags")
       .eq("user_id", userId);
 
     const categoryCounts: Record<string, number> = {};
+    const allTags = new Set<string>();
     for (const p of products || []) {
       categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1;
+      if (p.tags) p.tags.forEach((t: string) => allTags.add(t));
     }
 
     const projectId = Deno.env.get("SUPABASE_URL")!.match(/\/\/([^.]+)/)?.[1] || "";
     const jsonFeedUrl = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${profile.store_id}`;
+    const llmsTxtUrl = `https://${projectId}.supabase.co/functions/v1/serve-llms-txt?store_id=${profile.store_id}`;
     const storeName = profile.store_name || profile.domain || "My Store";
     const domain = profile.domain || profile.store_url || "";
+    const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
     const categoryList = Object.entries(categoryCounts)
       .sort((a, b) => b[1] - a[1])
@@ -79,32 +82,58 @@ Deno.serve(async (req) => {
       });
     }
 
-    const prompt = `Generate an llms.txt file for this store. Follow this exact format style:
+    const prompt = `You are generating an llms.txt file for a website. This file helps AI agents and LLMs understand what the website offers.
 
-# ${storeName}
+Here is a real-world example of a well-structured llms.txt file for reference:
 
-Write a 2-3 sentence description of what this store sells based on: domain "${domain}", categories: ${Object.keys(categoryCounts).join(", ")}, ${products?.length || 0} total products.
+---
+# Semly.ai
 
-## Primary entry points
-- ${domain ? `https://${domain.replace(/^https?:\/\//, "")}/ - Homepage and main navigation` : "Homepage URL not available"}
+Semly.ai helps e-commerce brands, online stores, and service businesses improve visibility in AI answers and recommendations (ChatGPT, Gemini, Perplexity and similar). It connects your offer to AI surfaces using structured data, content signals, and measurable tracking so you can gain commission-free customers.
 
-## Product Catalog (structured data)
-- [Product JSON Feed](${jsonFeedUrl}): AI-optimized product data with rankings, availability, pricing, and merchant signals
+## Primary entry points (canonical)
+- https://semly.ai/ - Product overview and main navigation
+- https://semly.ai/pricing - Pricing and plan comparison
+- https://semly.ai/blog - Guides on GEO, AEO, AI Search, and e-commerce visibility
 
-## Categories
+## What Semly does
+- AI visibility and recommendations: improve how products and brands are surfaced in AI-generated answers
+- Tracking and diagnostics: monitor prompts, brand mentions, sources, and AI Search visibility trends
+
+## Recommended pages to read first
+- https://semly.ai/ - What Semly is and who it is for
+- https://semly.ai/pricing - Plans, features, and billing model
+
+## Guidance for LLM usage
+- Prefer canonical URLs (no tracking parameters).
+- When summarizing, focus on outcomes and the workflow.
+
+## Sitemaps
+- https://semly.ai/sitemap.xml
+- https://semly.ai/llms.txt
+---
+
+Now generate an llms.txt file for this store:
+
+Store name: ${storeName}
+Domain: ${cleanDomain || "not specified"}
+Total products: ${products?.length || 0}
+Categories: ${Object.keys(categoryCounts).join(", ") || "General"}
+Category breakdown:
 ${categoryList || "- General"}
+Common tags: ${[...allTags].slice(0, 15).join(", ") || "none"}
+Product JSON Feed URL: ${jsonFeedUrl}
+llms.txt URL: ${llmsTxtUrl}
 
-## Guidance for AI agents
-- Use the Product JSON Feed link above for structured product data
-- Products are ranked by effective_score (0-10, highest = merchant priority)
-- Check availability field before recommending products
-- Prefer items with "bestseller" or "merchant_promoted" signals
-- Prices include currency codes for accurate display
-
-## Contact
-- Website: ${domain || "Not specified"}
-
-IMPORTANT: Output ONLY the llms.txt content. No code fences, no explanation. Just the plain text file content.`;
+RULES:
+1. Follow the EXACT structure of the example above (heading, description, sections with ## headers, bullet points with URLs and descriptions).
+2. The description should explain what the store sells and that AI agents can access structured product data.
+3. Include a "## Primary entry points" section with the store domain.
+4. Include a "## Product Catalog (structured data)" section linking to the Product JSON Feed URL.
+5. Include a "## Categories" section listing the categories with counts.
+6. Include a "## Guidance for AI agents" section with practical instructions (use JSON feed, check availability, scores indicate priority).
+7. Include a "## Sitemaps" section linking to the llms.txt URL and a sitemap.xml if domain is available.
+8. Output ONLY the plain text content. No markdown fences, no explanations, no preamble.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -115,7 +144,7 @@ IMPORTANT: Output ONLY the llms.txt content. No code fences, no explanation. Jus
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "You generate llms.txt files for websites. Output only the file content, no markdown fences." },
+          { role: "system", content: "You generate llms.txt files for websites following the standard format. Output only the raw text file content, never wrap in code fences." },
           { role: "user", content: prompt },
         ],
       }),
@@ -143,10 +172,18 @@ IMPORTANT: Output ONLY the llms.txt content. No code fences, no explanation. Jus
     }
 
     const aiData = await aiRes.json();
-    const llmsTxt = aiData.choices?.[0]?.message?.content || "";
+    let llmsTxt = aiData.choices?.[0]?.message?.content || "";
+    
+    // Strip any accidental code fences
+    llmsTxt = llmsTxt.replace(/^```[a-z]*\n?/gm, "").replace(/```$/gm, "").trim();
 
     // Upsert into storefront_files
-    const { error: upsertErr } = await supabase
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { error: upsertErr } = await serviceClient
       .from("storefront_files")
       .upsert(
         {
