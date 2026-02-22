@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 
@@ -23,19 +24,21 @@ export function ProductDetailDialog({ product, open, onOpenChange }: Props) {
   const [included, setIncluded] = useState(true);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
+  const [agentNotes, setAgentNotes] = useState("");
 
   useEffect(() => {
     if (product) {
       setBoost(product.boostScore);
       setIncluded(product.included);
       setTags([...product.tags]);
+      setAgentNotes(product.agentNotes || "");
     }
   }, [product]);
 
   if (!product) return null;
 
   const handleSave = () => {
-    updateProduct(product.id, { boostScore: boost, included, tags });
+    updateProduct(product.id, { boostScore: boost, included, tags, agentNotes: agentNotes || undefined });
     onOpenChange(false);
   };
 
@@ -129,6 +132,22 @@ export function ProductDetailDialog({ product, open, onOpenChange }: Props) {
               />
               <Button size="sm" variant="outline" onClick={addTag} className="h-8">Add</Button>
             </div>
+          </div>
+
+          {/* Agent Notes */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold">Notes to agent</label>
+              <span className="text-xs text-muted-foreground">{agentNotes.length}/280</span>
+            </div>
+            <Textarea
+              placeholder="e.g. This is our bestseller for Christmas. Highlight the limited stock."
+              value={agentNotes}
+              onChange={(e) => {
+                if (e.target.value.length <= 280) setAgentNotes(e.target.value);
+              }}
+              className="resize-none h-20 text-sm"
+            />
           </div>
         </div>
 
