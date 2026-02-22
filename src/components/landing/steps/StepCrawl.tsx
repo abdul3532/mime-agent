@@ -220,7 +220,7 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
           {stages.map((s, i) => (
             <div key={s} className="flex items-center gap-3 text-sm">
               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                i < stage || done ? "bg-accent text-accent-foreground" :
+                i < stage || done ? "bg-green-500 text-white" :
                 i === stage && !done && !error && !needsAuth ? "bg-primary text-primary-foreground animate-pulse" :
                 "bg-muted text-muted-foreground"
               }`}>
@@ -239,8 +239,8 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       {/* Already scanned state */}
       {alreadyScanned && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-          <div className="flex items-center gap-2 text-accent-foreground font-semibold">
-            <CheckCircle2 className="h-5 w-5 text-white" />
+          <div className="flex items-center gap-2 text-green-500 font-semibold">
+            <CheckCircle2 className="h-5 w-5" />
             Products already imported
           </div>
           <p className="text-sm text-muted-foreground">
@@ -287,8 +287,8 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       {/* Success state */}
       {done && result && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-          <div className="flex items-center gap-2 text-accent-foreground font-semibold">
-            <CheckCircle2 className="h-5 w-5 text-accent" />
+          <div className="flex items-center gap-2 text-green-500 font-semibold">
+            <CheckCircle2 className="h-5 w-5" />
             Scan complete
           </div>
 
