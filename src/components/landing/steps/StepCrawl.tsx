@@ -30,7 +30,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
   const [existingCount, setExistingCount] = useState(0);
   const [result, setResult] = useState<ScrapeResult | null>(null);
   const [progress, setProgress] = useState<ScrapeProgress | null>(null);
-  const runIdRef = useRef<string>(crypto.randomUUID());
+  const [runId, setRunId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     if (authLoading) return;
@@ -67,7 +67,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         }
       }
 
-      const runId = runIdRef.current;
+      
 
       // Start polling for progress
       pollTimer = setInterval(async () => {
@@ -173,7 +173,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [storeUrl, authLoading]);
+  }, [storeUrl, authLoading, runId]);
 
   const progressLabel = (() => {
     if (!progress) return "Starting scan...";
@@ -247,7 +247,7 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => {
               setAlreadyScanned(false);
-              runIdRef.current = crypto.randomUUID();
+              setRunId(crypto.randomUUID());
             }} className="gap-2">
               <RefreshCw className="h-4 w-4" /> Rescan
             </Button>
