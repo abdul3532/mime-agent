@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, ChevronDown, ChevronUp, CheckCircle2, XCircle, ArrowLeftRight } from "lucide-react";
+import { Copy, Download, ChevronDown, ChevronUp, CheckCircle2, XCircle, ArrowLeftRight, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboard } from "@/context/DashboardContext";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -25,19 +27,41 @@ const schema = {
   storefront: { required: ["id", "version", "products", "rules_applied", "total_products"] },
 };
 
+type PreviewMode = "markdown" | "json";
+
 export function PreviewSection({ storeId }: Props) {
   const { toast } = useToast();
-  const { products, rules, computeEffectiveScore } = useDashboard();
+  const { user } = useAuth();
+  const { products, rules, computeEffectiveScore, setActiveTab } = useDashboard();
+  const [mode, setMode] = useState<PreviewMode>("markdown");
   const [showExplain, setShowExplain] = useState(false);
   const [validateOpen, setValidateOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [llmsTxt, setLlmsTxt] = useState<string | null>(null);
+  const [loadingMd, setLoadingMd] = useState(true);
+
+  // Load llms_txt from storefront_files
+  useEffect(() => {
+    if (!user) { setLoadingMd(false); return; }
+    const load = async () => {
+      setLoadingMd(true);
+      const { data } = await supabase
+        .from("storefront_files")
+        .select("llms_txt")
+        .eq("user_id", user.id)
+        .order("generated_at", { ascending: false })
+        .limit(1);
+      setLlmsTxt(data && data.length > 0 ? (data[0] as any).llms_txt : null);
+      setLoadingMd(false);
+    };
+    load();
+  }, [user]);
 
   const buildJson = (prods: typeof products) => {
     const scoredProducts = prods
       .filter((p) => p.included)
       .map((p) => {
         const { effectiveScore, matchingRules } = computeEffectiveScore(p);
-        // Exclude products targeted by exclude rules
         const isExcluded = matchingRules.some((r) => r.action === "exclude");
         return { product: p, effectiveScore, matchingRules, isExcluded };
       })
@@ -73,77 +97,143 @@ export function PreviewSection({ storeId }: Props) {
   const json = buildJson(products);
   const liveJson = buildJson([]);
 
+  const currentContent = mode === "json" ? json : (llmsTxt || "");
+  const contentLabel = mode === "json" ? "JSON" : "Markdown";
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(json);
-    toast({ title: "Copied", description: "JSON copied to clipboard." });
+    navigator.clipboard.writeText(currentContent);
+    toast({ title: "Copied", description: `${contentLabel} copied to clipboard.` });
   };
 
-  // Simple validation
+  const handleDownload = () => {
+    const filename = mode === "json" ? "storefront.json" : "llms.txt";
+    const mimeType = mode === "json" ? "application/json" : "text/plain";
+    const blob = new Blob([currentContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Downloaded", description: `${filename} saved.` });
+  };
+
+  // Validation
   const validationResults = (() => {
-    try {
-      const parsed = JSON.parse(json);
-      const issues: string[] = [];
-      if (!parsed.storefront) issues.push("Missing 'storefront' root key");
-      else {
-        for (const key of schema.storefront.required) {
-          if (!(key in parsed.storefront)) issues.push(`Missing 'storefront.${key}'`);
+    if (mode === "json") {
+      try {
+        const parsed = JSON.parse(json);
+        const issues: string[] = [];
+        if (!parsed.storefront) issues.push("Missing 'storefront' root key");
+        else {
+          for (const key of schema.storefront.required) {
+            if (!(key in parsed.storefront)) issues.push(`Missing 'storefront.${key}'`);
+          }
+          if (parsed.storefront.products?.length === 0) issues.push("No products in output");
         }
-        if (parsed.storefront.products?.length === 0) issues.push("No products in output");
+        return { valid: issues.length === 0, issues };
+      } catch {
+        return { valid: false, issues: ["Invalid JSON"] };
       }
+    } else {
+      const issues: string[] = [];
+      if (!llmsTxt || llmsTxt.trim().length === 0) issues.push("Markdown file is empty");
+      else if (!llmsTxt.trimStart().startsWith("# ")) issues.push("File should start with a Markdown heading (# )");
       return { valid: issues.length === 0, issues };
-    } catch {
-      return { valid: false, issues: ["Invalid JSON"] };
     }
   })();
+
+  const showNoFile = mode === "markdown" && !loadingMd && !llmsTxt;
 
   return (
     <div className="space-y-4">
       <h2 className="font-heading text-2xl font-bold">Preview</h2>
 
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={handleCopy}>
-          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy JSON
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => toast({ title: "Download", description: "Download started (simulated)." })}>
-          <Download className="h-3.5 w-3.5 mr-1.5" /> Download
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setValidateOpen(true)}>
-          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Validate JSON
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setCompareOpen(true)}>
-          <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> Compare with live
-        </Button>
+      {/* Mode toggle */}
+      <div className="inline-flex rounded-lg border bg-muted/30 p-0.5">
+        <button
+          onClick={() => setMode("json")}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            mode === "json" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          JSON
+        </button>
+        <button
+          onClick={() => setMode("markdown")}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            mode === "markdown" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Markdown (llms.txt)
+        </button>
       </div>
 
-      <div className="code-block max-h-[500px] overflow-y-auto">
-        <pre className="text-xs">{json}</pre>
-      </div>
-
-      <button
-        onClick={() => setShowExplain(!showExplain)}
-        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {showExplain ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        Explain fields
-      </button>
-
-      {showExplain && (
-        <div className="card-elevated p-4 space-y-2">
-          {fieldExplanations.map((f) => (
-            <div key={f.field} className="flex gap-3 text-sm">
-              <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono shrink-0">{f.field}</code>
-              <span className="text-muted-foreground">{f.desc}</span>
-            </div>
-          ))}
+      {showNoFile ? (
+        <div className="card-elevated p-8 text-center space-y-4">
+          <Sparkles className="h-10 w-10 text-muted-foreground/30 mx-auto" />
+          <h3 className="text-lg font-semibold">No file generated yet</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            Go to the Generate tab to create your llms.txt file.
+          </p>
+          <Button onClick={() => setActiveTab("generate")}>
+            <Sparkles className="h-4 w-4 mr-2" /> Go to Generate
+          </Button>
         </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={handleCopy} disabled={mode === "markdown" && !llmsTxt}>
+              <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy {contentLabel}
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleDownload} disabled={mode === "markdown" && !llmsTxt}>
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Download
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setValidateOpen(true)}>
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Validate {contentLabel}
+            </Button>
+            {mode === "json" && (
+              <Button size="sm" variant="outline" onClick={() => setCompareOpen(true)}>
+                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> Compare with live
+              </Button>
+            )}
+          </div>
+
+          <div className="code-block max-h-[500px] overflow-y-auto">
+            <pre className="text-xs whitespace-pre-wrap">{currentContent}</pre>
+          </div>
+
+          {mode === "json" && (
+            <>
+              <button
+                onClick={() => setShowExplain(!showExplain)}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showExplain ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                Explain fields
+              </button>
+
+              {showExplain && (
+                <div className="card-elevated p-4 space-y-2">
+                  {fieldExplanations.map((f) => (
+                    <div key={f.field} className="flex gap-3 text-sm">
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono shrink-0">{f.field}</code>
+                      <span className="text-muted-foreground">{f.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {/* Validate Dialog */}
       <Dialog open={validateOpen} onOpenChange={setValidateOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>JSON Validation</DialogTitle>
-            <DialogDescription>Checking output against storefront schema.</DialogDescription>
+            <DialogTitle>{contentLabel} Validation</DialogTitle>
+            <DialogDescription>Checking output format.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             {validationResults.valid ? (
