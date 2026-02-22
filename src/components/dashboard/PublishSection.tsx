@@ -142,22 +142,50 @@ export function PublishSection({ storeId }: Props) {
 
       // If needs generation, build files inline (same logic as GenerateSection)
       if (needsGenerate) {
-        const included = products.filter((p) => p.included);
-        const top20 = included.slice(0, 20);
-        const categories = [...new Set(included.map((p) => p.category))];
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const genRes = await fetch(`${functionsBase}/generate-storefront`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+          });
 
-        llmsTxtContent = buildLlmsTxt(sid, top20, categories, false);
-        const llmsFullContent = buildLlmsTxt(sid, included, categories, true);
-        productCount = included.length;
+          // Drain the SSE stream silently — just wait for completion
+          if (genRes.ok && genRes.body) {
+            const reader = genRes.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            outer: while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try {
+                  const parsed = JSON.parse(line.slice(6));
+                  if (parsed.done) break outer;
+                } catch { /* ignore */ }
+              }
+            }
+          }
 
-        await supabase.from("storefront_files").insert({
-          user_id: user.id,
-          store_id: sid,
-          llms_txt: llmsTxtContent,
-          llms_full_txt: llmsFullContent,
-          product_count: included.length,
-          section_count: categories.length,
-        });
+          // Reload content from DB after generation completes
+          const { data: freshFiles } = await supabase
+            .from("storefront_files")
+            .select("llms_txt, product_count")
+            .eq("user_id", user.id)
+            .order("generated_at", { ascending: false })
+            .limit(1);
+
+          if (freshFiles && freshFiles.length > 0) {
+            llmsTxtContent = (freshFiles[0] as any).llms_txt;
+            productCount = (freshFiles[0] as any).product_count;
+          }
+        }
       }
 
       // Record publish in history
@@ -329,31 +357,3 @@ export function PublishSection({ storeId }: Props) {
   );
 }
 
-function buildLlmsTxt(storeId: string, prods: any[], categories: string[], isFull: boolean): string {
-  const lines: string[] = [];
-  lines.push(`# ${storeId} — AI Storefront`);
-  lines.push("");
-  lines.push(`> ${isFull ? "Full" : "Summary"} product catalogue for AI shopping agents.`);
-  lines.push(`> Generated ${new Date().toISOString()}`);
-  lines.push(`> ${prods.length} products across ${categories.length} categories`);
-  lines.push("");
-
-  for (const cat of categories) {
-    const catProducts = prods.filter((p: any) => p.category === cat);
-    if (catProducts.length === 0) continue;
-    lines.push(`## ${cat}`);
-    lines.push("");
-    for (const p of catProducts) {
-      lines.push(`### ${p.title}`);
-      lines.push(`- Price: ${p.currency} ${p.price}`);
-      lines.push(`- Availability: ${p.availability.replace(/_/g, " ")}`);
-      lines.push(`- Inventory: ${p.inventory} units`);
-      if (p.tags?.length) lines.push(`- Tags: ${p.tags.join(", ")}`);
-      if (p.agentNotes) lines.push(`- Agent note: ${p.agentNotes}`);
-      if (p.url) lines.push(`- URL: ${p.url}`);
-      lines.push(`- Boost score: ${p.boostScore}/10`);
-      lines.push("");
-    }
-  }
-  return lines.join("\n");
-}
