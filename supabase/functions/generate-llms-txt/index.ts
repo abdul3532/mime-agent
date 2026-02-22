@@ -42,11 +42,21 @@ Deno.serve(async (req) => {
       .eq("user_id", userId)
       .single();
 
-    if (!profile?.store_id) {
-      return new Response(JSON.stringify({ error: "No store configured" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let storeId = profile?.store_id;
+    if (!storeId) {
+      // Auto-generate store_id from user id
+      storeId = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+      const { error: updateErr } = await supabase
+        .from("profiles")
+        .update({ store_id: storeId })
+        .eq("user_id", userId);
+      if (updateErr) {
+        console.error("Failed to set store_id:", updateErr.message);
+        return new Response(JSON.stringify({ error: "Failed to configure store" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Load products for category summary
@@ -63,8 +73,8 @@ Deno.serve(async (req) => {
     }
 
     const projectId = Deno.env.get("SUPABASE_URL")!.match(/\/\/([^.]+)/)?.[1] || "";
-    const jsonFeedUrl = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${profile.store_id}`;
-    const llmsTxtUrl = `https://${projectId}.supabase.co/functions/v1/serve-llms-txt?store_id=${profile.store_id}`;
+    const jsonFeedUrl = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${storeId}`;
+    const llmsTxtUrl = `https://${projectId}.supabase.co/functions/v1/serve-llms-txt?store_id=${storeId}`;
     const storeName = profile.store_name || profile.domain || "My Store";
     const domain = profile.domain || profile.store_url || "";
     const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -188,7 +198,7 @@ RULES:
       .upsert(
         {
           user_id: userId,
-          store_id: profile.store_id,
+          store_id: storeId,
           llms_txt: llmsTxt,
           product_count: products?.length || 0,
           section_count: Object.keys(categoryCounts).length,
