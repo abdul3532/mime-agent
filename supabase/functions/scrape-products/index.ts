@@ -371,8 +371,34 @@ Skip non-product pages (about, contact, FAQ, etc). Return [] if no products foun
 
     const categories = [...allCategories];
 
+    await updateProgress({ status: "generating_storefront", extracted_products: totalExtracted });
+    console.log("Done scraping! Products:", totalExtracted, "Categories:", categories.length);
+
+    // Auto-generate storefront (llms.txt) after successful crawl
+    try {
+      console.log("Auto-generating storefront...");
+      const generateRes = await fetch(
+        `${Deno.env.get("SUPABASE_URL")!}/functions/v1/generate-llms-txt`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: authHeader!,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        }
+      );
+      if (generateRes.ok) {
+        console.log("Storefront generated successfully");
+      } else {
+        const errText = await generateRes.text();
+        console.error("Storefront generation failed:", errText.substring(0, 200));
+      }
+    } catch (e) {
+      console.error("Storefront generation error:", e);
+    }
+
     await updateProgress({ status: "done", extracted_products: totalExtracted });
-    console.log("Done! Products:", totalExtracted, "Categories:", categories.length);
 
     return new Response(
       JSON.stringify({
