@@ -17,7 +17,7 @@ export interface ScrapeProgress {
   error_message: string | null;
 }
 
-export async function scrapeProducts(url: string, runId: string): Promise<ScrapeResult> {
+export async function scrapeProducts(url: string, runId: string, storefrontId: string): Promise<ScrapeResult> {
   // Ensure we have a valid session before the long-running scrape
   const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
   
@@ -32,7 +32,7 @@ export async function scrapeProducts(url: string, runId: string): Promise<Scrape
   }
 
   const { data, error } = await supabase.functions.invoke("scrape-products", {
-    body: { url, runId },
+    body: { url, runId, storefrontId },
   });
 
   if (error) {

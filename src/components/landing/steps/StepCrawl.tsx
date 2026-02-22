@@ -32,6 +32,7 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
   const [result, setResult] = useState<ScrapeResult | null>(null);
   const [progress, setProgress] = useState<ScrapeProgress | null>(null);
   const runIdRef = useRef<string>(crypto.randomUUID());
+  const [storefrontId, setStorefrontId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -46,30 +47,58 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       setAlreadyScanned(false);
       setProgress(null);
 
-      // Save store_id to profile immediately so the storefront endpoint works
-      if (user && storeId) {
-        const cleanDomain = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
-        await supabase
-          .from("profiles")
-          .update({ store_id: storeId, store_url: storeUrl, domain: cleanDomain })
-          .eq("user_id", user.id);
+      if (!user) {
+        setNeedsAuth(true);
+        return;
       }
 
-      // Check if user already has products from this specific store URL
-      if (user && storeUrl) {
-        // Normalize the URL for matching (strip protocol and trailing slash)
-        const normalizedUrl = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
-        const { count } = await supabase
-          .from("products")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .ilike("url", `%${normalizedUrl}%`);
-        
-        if (count && count > 0) {
-          setAlreadyScanned(true);
-          setExistingCount(count);
+      // Create or find storefront
+      const cleanDomain = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      
+      // Check if storefront already exists for this domain
+      const { data: existingSf } = await supabase
+        .from("storefronts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("domain", cleanDomain)
+        .maybeSingle();
+
+      let sfId: string;
+      if (existingSf) {
+        sfId = existingSf.id;
+      } else {
+        // Create new storefront
+        const { data: newSf, error: sfErr } = await supabase
+          .from("storefronts")
+          .insert({
+            user_id: user.id,
+            store_id: storeId,
+            store_url: storeUrl,
+            domain: cleanDomain,
+            store_name: cleanDomain,
+          })
+          .select("id")
+          .single();
+
+        if (sfErr || !newSf) {
+          setError("Failed to create storefront: " + (sfErr?.message || "Unknown error"));
           return;
         }
+        sfId = newSf.id;
+      }
+
+      setStorefrontId(sfId);
+
+      // Check if storefront already has products
+      const { count } = await supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("storefront_id", sfId);
+      
+      if (count && count > 0) {
+        setAlreadyScanned(true);
+        setExistingCount(count);
+        return;
       }
 
       const runId = runIdRef.current;
@@ -93,7 +122,7 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       }, 2000);
 
       try {
-        const res = await scrapeProducts(storeUrl, runId);
+        const res = await scrapeProducts(storeUrl, runId, sfId);
         if (pollTimer) clearInterval(pollTimer);
         if (cancelled) return;
 
@@ -109,7 +138,6 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
         setStage(3);
         setResult(res);
 
-
         // Final progress fetch
         const finalProgress = await pollScrapeProgress(runId);
         if (finalProgress) setProgress(finalProgress);
@@ -124,7 +152,6 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
         // Edge function may have timed out — check if products were saved incrementally
         const finalProgress = await pollScrapeProgress(runId);
         if (finalProgress && finalProgress.extracted_products > 0) {
-          // Partial success: products were saved before timeout
           setStage(3);
           setProgress({ ...finalProgress, status: "done" });
           setResult({
@@ -229,7 +256,6 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
           </div>
         </motion.div>
       )}
-
 
       {needsAuth && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">

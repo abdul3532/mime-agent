@@ -46,16 +46,17 @@ const navGroups = [
 const allTabs = navGroups.flatMap((g) => g.items);
 
 function DashboardInner() {
-  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, scanStep, setScanStep, lastScannedAt, setLastScannedAt } = useDashboard();
+  const { activeTab, setActiveTab, loading, reloadProducts, rescanning, setRescanning, scanStep, setScanStep, lastScannedAt, setLastScannedAt, storefront } = useDashboard();
   const [status] = useState<"draft" | "published" | "verified">("draft");
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
-  const storeUrl = localStorage.getItem("mime_store_url") || "";
-  const storeId = localStorage.getItem("mime_store_id") || "";
-  const storeName = storeUrl ? new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname : "No store connected";
+
+  const storeId = storefront?.store_id || localStorage.getItem("mime_store_id") || "";
+  const storeUrl = storefront?.store_url || localStorage.getItem("mime_store_url") || "";
+  const storeName = storefront?.domain || storefront?.store_name || (storeUrl ? (() => { try { return new URL(storeUrl.startsWith("http") ? storeUrl : `https://${storeUrl}`).hostname; } catch { return "No store connected"; } })() : "No store connected");
 
   const lastScannedLabel = useMemo(() => {
     if (!lastScannedAt) return null;
@@ -73,17 +74,20 @@ function DashboardInner() {
       toast({ title: "No store URL", description: "Connect a store first.", variant: "destructive" });
       return;
     }
+    if (!storefront) {
+      toast({ title: "No storefront", description: "Create a storefront first.", variant: "destructive" });
+      return;
+    }
     setRescanning(true);
     setScanStep("Discovering product pages...");
     toast({ title: "Re-scanning...", description: "Scraping products from your store." });
     try {
-      // Simulate step progression while edge function runs
       const stepTimer = setTimeout(() => setScanStep("Scraping product content..."), 5000);
       const stepTimer2 = setTimeout(() => setScanStep("Extracting product data with AI..."), 15000);
       const stepTimer3 = setTimeout(() => setScanStep("Saving to database..."), 25000);
 
       const { scrapeProducts } = await import("@/lib/api/scrapeProducts");
-      const result = await scrapeProducts(storeUrl, crypto.randomUUID());
+      const result = await scrapeProducts(storeUrl, crypto.randomUUID(), storefront.id);
 
       clearTimeout(stepTimer);
       clearTimeout(stepTimer2);
@@ -103,7 +107,7 @@ function DashboardInner() {
       setRescanning(false);
       setScanStep("");
     }
-  }, [storeUrl, reloadProducts, toast]);
+  }, [storeUrl, storefront, reloadProducts, toast]);
 
   const handleSignOut = async () => {
     await signOut();

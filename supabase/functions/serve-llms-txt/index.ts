@@ -34,22 +34,22 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Resolve store_id to user_id via profiles
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("user_id")
+    // Resolve store_id via storefronts table
+    const { data: storefront, error: sfError } = await supabase
+      .from("storefronts")
+      .select("id")
       .eq("store_id", storeId)
       .maybeSingle();
 
-    if (profileError) {
-      console.error("Profile lookup failed:", profileError.message);
+    if (sfError) {
+      console.error("Storefront lookup failed:", sfError.message);
       return new Response("Internal server error", {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "text/plain" },
       });
     }
 
-    if (!profile) {
+    if (!storefront) {
       return new Response("Store not found", {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "text/plain" },
@@ -59,11 +59,11 @@ Deno.serve(async (req) => {
     const { data: sf, error: storefrontError } = await supabase
       .from("storefront_files")
       .select("llms_txt")
-      .eq("user_id", profile.user_id)
+      .eq("storefront_id", storefront.id)
       .maybeSingle();
 
     if (storefrontError) {
-      console.error("Storefront lookup failed:", storefrontError.message);
+      console.error("Storefront files lookup failed:", storefrontError.message);
       return new Response("Internal server error", {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "text/plain" },

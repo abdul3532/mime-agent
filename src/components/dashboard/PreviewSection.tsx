@@ -31,31 +31,42 @@ const schema = {
 export function PreviewSection({ storeId }: Props) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { products, rules, computeEffectiveScore } = useDashboard();
+  const { products, rules, computeEffectiveScore, storefront } = useDashboard();
   const [showExplain, setShowExplain] = useState(false);
   const [validateOpen, setValidateOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [llmsTxt, setLlmsTxt] = useState<string | null>(null);
 
-  // Load existing llms.txt
+  // Load existing llms.txt by storefront_id
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("storefront_files")
-      .select("llms_txt")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data }) => {
+    const load = async () => {
+      if (storefront) {
+        const { data } = await supabase
+          .from("storefront_files")
+          .select("llms_txt")
+          .eq("storefront_id", storefront.id)
+          .maybeSingle();
         if (data?.llms_txt) setLlmsTxt(data.llms_txt);
-      });
-  }, [user]);
+        else setLlmsTxt(null);
+      } else {
+        const { data } = await supabase
+          .from("storefront_files")
+          .select("llms_txt")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data?.llms_txt) setLlmsTxt(data.llms_txt);
+        else setLlmsTxt(null);
+      }
+    };
+    load();
+  }, [user, storefront]);
 
   const buildJson = (prods: typeof products) => {
     const scoredProducts = prods
       .filter((p) => p.included)
       .map((p) => {
         const { effectiveScore, matchingRules } = computeEffectiveScore(p);
-        // Exclude products targeted by exclude rules
         const isExcluded = matchingRules.some((r) => r.action === "exclude");
         return { product: p, effectiveScore, matchingRules, isExcluded };
       })
@@ -98,7 +109,6 @@ export function PreviewSection({ storeId }: Props) {
 
   const handleCopy = () => copy(json, "JSON");
 
-  // Simple validation
   const validationResults = (() => {
     try {
       const parsed = JSON.parse(json);
