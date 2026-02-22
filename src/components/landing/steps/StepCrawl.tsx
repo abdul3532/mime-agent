@@ -213,7 +213,7 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       {alreadyScanned && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           <div className="flex items-center gap-2 text-accent-foreground font-semibold">
-            <CheckCircle2 className="h-5 w-5 text-accent" />
+            <CheckCircle2 className="h-5 w-5 text-white" />
             Products already imported
           </div>
           <p className="text-sm text-muted-foreground">
