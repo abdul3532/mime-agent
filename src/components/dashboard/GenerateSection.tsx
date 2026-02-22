@@ -206,7 +206,8 @@ export function GenerateSection() {
 
   // --- STATE 2: GENERATING ---
   if (state === "generating") {
-    const progress = (stepIndex / STREAM_STEPS.length) * 100;
+    const TOTAL_STEPS = 5;
+    const progress = Math.min((stepIndex / TOTAL_STEPS) * 100, 100);
 
     return (
       <div className="space-y-6 max-w-2xl">
@@ -234,7 +235,7 @@ export function GenerateSection() {
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          Step {stepIndex} of {STREAM_STEPS.length}
+          Step {Math.min(stepIndex, TOTAL_STEPS)} of {TOTAL_STEPS}
         </p>
       </div>
     );
