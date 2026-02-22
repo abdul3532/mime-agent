@@ -4,7 +4,7 @@ import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
-  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User, Bot, Sparkles,
+  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User, Bot, Sparkles, Play,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
@@ -206,6 +206,9 @@ function DashboardInner() {
             </Button>
             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground">
               <Bell className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate("/demo")} className="h-8">
+              <Play className="h-3.5 w-3.5 mr-1.5" /> Demo
             </Button>
             <Button size="sm" variant="outline" onClick={handleRescan} disabled={rescanning} className="group h-8">
               <RefreshCw className={`h-3.5 w-3.5 mr-1.5 transition-transform ${rescanning ? "animate-spin" : "group-hover:rotate-180"} duration-500`} /> {rescanning ? "Scanning..." : "Re-scan"}
