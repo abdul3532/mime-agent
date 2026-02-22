@@ -4,7 +4,7 @@ import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
-  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User,
+  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User, Bot,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
@@ -15,13 +15,17 @@ import { ProductsSection } from "@/components/dashboard/ProductsSection";
 import { RulesSection } from "@/components/dashboard/RulesSection";
 import { PreviewSection } from "@/components/dashboard/PreviewSection";
 import { PublishSection } from "@/components/dashboard/PublishSection";
+import { AgentAnalyticsSection } from "@/components/dashboard/AgentAnalyticsSection";
 import { GlobalSearchCommand } from "@/components/dashboard/GlobalSearchCommand";
 import { useToast } from "@/hooks/use-toast";
 
 const navGroups = [
   {
     label: "Analytics",
-    items: [{ id: "overview", label: "Overview", icon: LayoutDashboard }],
+    items: [
+      { id: "overview", label: "Overview", icon: LayoutDashboard },
+      { id: "agent-analytics", label: "Agent Activity", icon: Bot },
+    ],
   },
   {
     label: "Storefront",
@@ -217,6 +221,7 @@ function DashboardInner() {
           <AnimatePresence mode="wait">
             <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
               {activeTab === "overview" && <OverviewSection />}
+              {activeTab === "agent-analytics" && <AgentAnalyticsSection />}
               {activeTab === "products" && <ProductsSection />}
               {activeTab === "rules" && <RulesSection />}
               {activeTab === "preview" && <PreviewSection storeId={storeId} />}
