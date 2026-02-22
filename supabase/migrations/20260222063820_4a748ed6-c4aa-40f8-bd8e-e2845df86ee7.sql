@@ -1,0 +1,1 @@
+ALTER TABLE scrape_progress ADD COLUMN raw_samples jsonb DEFAULT NULL;

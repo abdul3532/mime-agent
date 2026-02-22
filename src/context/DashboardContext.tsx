@@ -37,6 +37,9 @@ interface DashboardContextType {
   seedDemoProducts: () => Promise<void>;
   seeding: boolean;
   computeEffectiveScore: (product: Product) => { effectiveScore: number; delta: number; matchingRules: Rule[] };
+  deleteStoreData: () => Promise<void>;
+  deleting: boolean;
+  rawSamples: any[] | null;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -53,6 +56,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [scanStep, setScanStep] = useState("");
   const [lastScannedAt, setLastScannedAt] = useState<Date | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [rawSamples, setRawSamples] = useState<any[] | null>(null);
 
   // Load products from DB
   useEffect(() => {
@@ -99,6 +104,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           id: r.id, name: r.name, field: r.field, condition: r.condition,
           value: r.value, action: r.action, amount: r.amount,
         })));
+      }
+
+      // Load raw samples from latest scrape_progress
+      const { data: latestScrape } = await supabase
+        .from("scrape_progress")
+        .select("raw_samples")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (latestScrape?.[0]?.raw_samples) {
+        setRawSamples(latestScrape[0].raw_samples as any[]);
       }
 
       setLoading(false);
@@ -265,6 +281,24 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }, [user, reloadProducts, toast]);
 
+  const deleteStoreData = useCallback(async () => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      await supabase.from("products").delete().eq("user_id", user.id);
+      await supabase.from("rules").delete().eq("user_id", user.id);
+      setProducts([]);
+      setRules([]);
+      setRawSamples(null);
+      setLastScannedAt(null);
+      toast({ title: "Deleted", description: "All store data has been removed." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to delete data.", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  }, [user, toast]);
+
     return (
     <DashboardContext.Provider value={{
       products, setProducts, updateProduct,
@@ -277,6 +311,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       saveProducts, saveRules, reloadProducts,
       seedDemoProducts, seeding,
       computeEffectiveScore,
+      deleteStoreData, deleting,
+      rawSamples,
     }}>
       {children}
     </DashboardContext.Provider>
