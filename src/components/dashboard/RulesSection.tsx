@@ -27,7 +27,7 @@ const templates = [
 ];
 
 export function RulesSection() {
-  const { products, rules, setRules } = useDashboard();
+  const { products, rules, setRules, computeEffectiveScore } = useDashboard();
   const [goal, setGoal] = useState("revenue");
   const { toast } = useToast();
 
@@ -49,28 +49,13 @@ export function RulesSection() {
     toast({ title: "Rule removed" });
   };
 
-  // Compute impact
-  const computeRulesForProduct = (p: Product) => {
-    const matching: Rule[] = [];
-    let delta = 0;
-    for (const r of rules) {
-      let matches = false;
-      if (r.action === "exclude" && r.field === "availability" && p.availability === r.value) { matching.push(r); continue; }
-      if (r.field === "tags" && r.condition === "contains" && p.tags.includes(r.value)) matches = true;
-      if (r.field === "margin" && r.condition === "greater_than" && p.margin > Number(r.value)) matches = true;
-      if (r.field === "price" && r.condition === "less_than" && p.price < Number(r.value)) matches = true;
-      if (r.field === "category" && r.condition === "equals" && p.category === r.value) matches = true;
-      if (matches) { delta += r.amount; matching.push(r); }
-    }
-    return { delta, matching };
-  };
-
   const impactProducts = [...products]
     .filter((p) => p.included)
     .map((p) => {
-      const { delta, matching } = computeRulesForProduct(p);
-      if (rules.some((r) => r.action === "exclude" && r.field === "availability" && p.availability === r.value)) return null;
-      return { ...p, delta, effectiveScore: p.boostScore + delta, matchingRules: matching };
+      const { effectiveScore, delta, matchingRules } = computeEffectiveScore(p);
+      const isExcluded = matchingRules.some((r) => r.action === "exclude");
+      if (isExcluded) return null;
+      return { ...p, delta, effectiveScore, matchingRules };
     })
     .filter(Boolean)
     .sort((a, b) => b!.effectiveScore - a!.effectiveScore)
