@@ -3,5 +3,11 @@ project_id = "paijyobnnrcidapjqcln"
 [functions.scrape-products]
 verify_jwt = false
 
+[functions.serve-llms]
+verify_jwt = false
+
 [functions.serve-agent-json]
+verify_jwt = false
+
+[functions.track-event]
 verify_jwt = false
