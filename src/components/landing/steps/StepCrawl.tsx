@@ -45,9 +45,14 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
       setAlreadyScanned(false);
       setProgress(null);
 
+      // Require auth before attempting scrape
+      if (!user) {
+        setNeedsAuth(true);
+        return;
+      }
+
       // Check if user already has products from this specific store URL
-      if (user && storeUrl) {
-        // Normalize the URL for matching (strip protocol and trailing slash)
+      if (storeUrl) {
         const normalizedUrl = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
         const { count } = await supabase
           .from("products")
