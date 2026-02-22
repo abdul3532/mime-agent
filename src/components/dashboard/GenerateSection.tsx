@@ -109,43 +109,91 @@ export function GenerateSection() {
     setStreamLines([]);
     setStepIndex(0);
 
-    // Simulate streaming progress (will be replaced by SSE when edge function is ready)
-    for (let i = 0; i < STREAM_STEPS.length; i++) {
-      await new Promise((r) => setTimeout(r, i === STREAM_STEPS.length - 1 ? 500 : 1500 + Math.random() * 1500));
-      const prefix = i === STREAM_STEPS.length - 1 ? "✓" : "→";
-      setStreamLines((prev) => [...prev, `${prefix} ${STREAM_STEPS[i]}`]);
-      setStepIndex(i + 1);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({ title: "Error", description: "Not authenticated.", variant: "destructive" });
+      setState("idle");
+      return;
     }
 
-    // Build simple llms.txt content from products
-    const included = products.filter((p) => p.included);
-    const top20 = included.slice(0, 20);
-    const categories = [...new Set(included.map((p) => p.category))];
+    try {
+      const res = await fetch(
+        `${functionsBase}/generate-storefront`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-    const llmsTxt = buildLlmsTxt(storeId, top20, categories, false);
-    const llmsFullTxt = buildLlmsTxt(storeId, included, categories, true);
+      if (!res.ok || !res.body) {
+        toast({ title: "Error", description: "Could not start generation.", variant: "destructive" });
+        setState("idle");
+        return;
+      }
 
-    // Save to DB
-    await supabase.from("storefront_files").insert({
-      user_id: user.id,
-      store_id: storeId,
-      llms_txt: llmsTxt,
-      llms_full_txt: llmsFullTxt,
-      product_count: included.length,
-      section_count: categories.length,
-    });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-    setLastFile({
-      llms_txt: llmsTxt,
-      llms_full_txt: llmsFullTxt,
-      generated_at: new Date().toISOString(),
-      product_count: included.length,
-      section_count: categories.length,
-    });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            if (parsed.message) {
+              setStreamLines(prev => [...prev, parsed.message]);
+              setStepIndex(prev => Math.min(prev + 1, STREAM_STEPS.length));
+            }
+            if (parsed.done) {
+              const { data: files } = await supabase
+                .from("storefront_files")
+                .select("llms_txt, llms_full_txt, generated_at, product_count, section_count")
+                .eq("user_id", user.id)
+                .order("generated_at", { ascending: false })
+                .limit(1);
+              if (files && files.length > 0) {
+                setLastFile(files[0] as StorefrontFile);
+              }
+              setState("complete");
+              toast({ title: "Generated!", description: "Your AI storefront files are ready." });
+              return;
+            }
+            if (parsed.error) {
+              toast({ title: "Error", description: parsed.message, variant: "destructive" });
+              setState("idle");
+              return;
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
 
-    setState("complete");
-    toast({ title: "Generated!", description: "Your AI storefront files are ready." });
-  }, [user, storeId, products, toast]);
+      // If stream ended without done signal, check DB anyway
+      const { data: files } = await supabase
+        .from("storefront_files")
+        .select("llms_txt, llms_full_txt, generated_at, product_count, section_count")
+        .eq("user_id", user.id)
+        .order("generated_at", { ascending: false })
+        .limit(1);
+      if (files && files.length > 0) {
+        setLastFile(files[0] as StorefrontFile);
+        setState("complete");
+        toast({ title: "Generated!", description: "Your AI storefront files are ready." });
+      } else {
+        setState("idle");
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Generation failed. Please try again.", variant: "destructive" });
+      setState("idle");
+    }
+  }, [user, storeId, functionsBase, toast]);
 
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -353,36 +401,3 @@ function FileCard({ title, subtitle, url, onCopy }: { title: string; subtitle: s
   );
 }
 
-// --- llms.txt builder ---
-
-function buildLlmsTxt(storeId: string, products: any[], categories: string[], isFull: boolean): string {
-  const lines: string[] = [];
-  lines.push(`# ${storeId} — AI Storefront`);
-  lines.push("");
-  lines.push(`> ${isFull ? "Full" : "Summary"} product catalogue for AI shopping agents.`);
-  lines.push(`> Generated ${new Date().toISOString()}`);
-  lines.push(`> ${products.length} products across ${categories.length} categories`);
-  lines.push("");
-
-  for (const cat of categories) {
-    const catProducts = products.filter((p) => p.category === cat);
-    if (catProducts.length === 0) continue;
-
-    lines.push(`## ${cat}`);
-    lines.push("");
-
-    for (const p of catProducts) {
-      lines.push(`### ${p.title}`);
-      lines.push(`- Price: ${p.currency} ${p.price}`);
-      lines.push(`- Availability: ${p.availability.replace(/_/g, " ")}`);
-      lines.push(`- Inventory: ${p.inventory} units`);
-      if (p.tags && p.tags.length > 0) lines.push(`- Tags: ${p.tags.join(", ")}`);
-      if (p.agentNotes) lines.push(`- Agent note: ${p.agentNotes}`);
-      if (p.url) lines.push(`- URL: ${p.url}`);
-      lines.push(`- Boost score: ${p.boostScore}/10`);
-      lines.push("");
-    }
-  }
-
-  return lines.join("\n");
-}

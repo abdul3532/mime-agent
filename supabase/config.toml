@@ -9,5 +9,11 @@ verify_jwt = false
 [functions.serve-agent-json]
 verify_jwt = false
 
+[functions.generate-storefront]
+verify_jwt = false
+
+[functions.track-event]
+verify_jwt = false
+
 [functions.track-event]
 verify_jwt = false
