@@ -6,7 +6,7 @@ import { StepUrl } from "./steps/StepUrl";
 import { StepChat } from "./steps/StepChat";
 import { StepCrawl } from "./steps/StepCrawl";
 import { StepInstall } from "./steps/StepInstall";
-import { CelebratingMime } from "./CelebratingMime";
+
 
 type StepStatus = "locked" | "active" | "completed";
 
@@ -64,7 +64,7 @@ export function WizardContainer() {
 
   return (
     <section id="wizard" className="py-20 md:py-28 relative">
-      {currentStep >= 3 && <CelebratingMime />}
+      
       <div className="container mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
