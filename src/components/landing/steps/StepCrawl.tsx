@@ -55,28 +55,28 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       // Create or find storefront
       const cleanDomain = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
       
-      // Check if storefront already exists for this domain
+      // Check if storefront already exists for this domain or store_id
       const { data: existingSf } = await supabase
         .from("storefronts")
         .select("id")
         .eq("user_id", user.id)
-        .eq("domain", cleanDomain)
+        .or(`domain.eq.${cleanDomain},store_id.eq.${storeId}`)
         .maybeSingle();
 
       let sfId: string;
       if (existingSf) {
         sfId = existingSf.id;
       } else {
-        // Create new storefront
+        // Create new storefront using upsert to handle race conditions
         const { data: newSf, error: sfErr } = await supabase
           .from("storefronts")
-          .insert({
+          .upsert({
             user_id: user.id,
             store_id: storeId,
             store_url: storeUrl,
             domain: cleanDomain,
             store_name: cleanDomain,
-          })
+          }, { onConflict: "store_id" })
           .select("id")
           .single();
 
