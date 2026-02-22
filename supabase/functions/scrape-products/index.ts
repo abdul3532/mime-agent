@@ -236,67 +236,79 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 4096,
-          tools: [{
-            name: "extract_products",
-            description: "Extract structured product data from scraped markdown pages",
-            input_schema: {
-              type: "object",
-              properties: {
-                products: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      price: { type: "number", description: "Numeric price. 100kr=100, 14,95=14.95" },
-                      currency: { type: "string", description: "ISO 4217: kr/SEK, €/EUR, £/GBP, $/USD" },
-                      category: { type: "string" },
-                      availability: { type: "string", enum: ["in_stock", "out_of_stock", "preorder"] },
-                      image: { type: "string" },
-                      tags: { type: "array", items: { type: "string" } },
-                      inventory: { type: "number" },
-                      url: { type: "string" },
-                      variants: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            label: { type: "string" },
-                            price: { type: "number" },
-                            availability: { type: "string" }
+      let aiRes: Response | null = null;
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 4096,
+            tools: [{
+              name: "extract_products",
+              description: "Extract structured product data from scraped markdown pages",
+              input_schema: {
+                type: "object",
+                properties: {
+                  products: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        title: { type: "string" },
+                        price: { type: "number", description: "Numeric price. 100kr=100, 14,95=14.95" },
+                        currency: { type: "string", description: "ISO 4217: kr/SEK, €/EUR, £/GBP, $/USD" },
+                        category: { type: "string" },
+                        availability: { type: "string", enum: ["in_stock", "out_of_stock", "preorder"] },
+                        image: { type: "string" },
+                        tags: { type: "array", items: { type: "string" } },
+                        inventory: { type: "number" },
+                        url: { type: "string" },
+                        variants: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              label: { type: "string" },
+                              price: { type: "number" },
+                              availability: { type: "string" }
+                            }
                           }
                         }
-                      }
-                    },
-                    required: ["title", "url"]
+                      },
+                      required: ["title", "url"]
+                    }
                   }
-                }
-              },
-              required: ["products"]
-            }
-          }],
-          tool_choice: { type: "tool", name: "extract_products" },
-          system: `You are a product data extractor. Extract structured product data from e-commerce page markdown.
+                },
+                required: ["products"]
+              }
+            }],
+            tool_choice: { type: "tool", name: "extract_products" },
+            system: `You are a product data extractor. Extract structured product data from e-commerce page markdown.
 Only extract fields you are confident about — uncertain fields should be omitted entirely, never guessed.
 Parse prices carefully: 100kr = 100 SEK, 14,95 = 14.95. Return as number.
 If a product has variants (sizes, colours), return ONE parent product with a variants array.
 Skip navigation, footer, about pages. Return empty array if no products found.`,
-          messages: [{ role: "user", content: `Extract all products from these pages:\n\n${pagesText}` }]
-        })
-      });
+            messages: [{ role: "user", content: `Extract all products from these pages:\n\n${pagesText}` }]
+          })
+        });
 
-      if (!aiRes.ok) {
-        const errText = await aiRes.text();
+        if (aiRes.status === 429) {
+          const waitSec = Math.pow(2, attempt + 1) * 15; // 30s, 60s, 120s
+          console.log(`Rate limited, waiting ${waitSec}s before retry ${attempt + 1}/${maxRetries}`);
+          await new Promise(r => setTimeout(r, waitSec * 1000));
+          continue;
+        }
+        break;
+      }
+
+      if (!aiRes || !aiRes.ok) {
+        const errText = aiRes ? await aiRes.text() : "No response";
         console.error("Anthropic extraction failed:", errText.substring(0, 200));
         continue;
       }

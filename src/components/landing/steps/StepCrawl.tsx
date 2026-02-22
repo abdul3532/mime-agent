@@ -76,7 +76,20 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
         else if (p.status === "scraping") setStage(1);
         else if (p.status === "extracting") setStage(2);
         else if (p.status === "saving") setStage(3);
-        else if (p.status === "error") {
+        else if (p.status === "done") {
+          if (pollTimer) clearInterval(pollTimer);
+          setStage(3);
+          setResult({
+            success: true,
+            products_found: p.extracted_products,
+            categories: [],
+            pages_scanned: p.scraped_pages,
+            runId,
+          });
+          setTimeout(() => {
+            if (!cancelled) setDone(true);
+          }, 800);
+        } else if (p.status === "error") {
           setError(p.error_message || "Scraping failed");
           if (pollTimer) clearInterval(pollTimer);
         }
@@ -84,10 +97,10 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
 
       try {
         const res = await scrapeProducts(storeUrl, runId);
-        if (pollTimer) clearInterval(pollTimer);
         if (cancelled) return;
 
         if (!res.success) {
+          if (pollTimer) clearInterval(pollTimer);
           if (res.error?.includes("Session expired") || res.error?.includes("sign in") || res.error?.includes("Unauthorized")) {
             setNeedsAuth(true);
           } else {
@@ -96,24 +109,30 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
           return;
         }
 
-        setStage(3);
-        setResult(res);
+        // If the function returned quickly with real results, we're done
+        if (res.products_found > 0) {
+          if (pollTimer) clearInterval(pollTimer);
+          setStage(3);
+          setResult(res);
+          const finalProgress = await pollScrapeProgress(runId);
+          if (finalProgress) setProgress(finalProgress);
+          setTimeout(() => {
+            if (!cancelled) setDone(true);
+          }, 800);
+          return;
+        }
 
-        // Final progress fetch
-        const finalProgress = await pollScrapeProgress(runId);
-        if (finalProgress) setProgress(finalProgress);
-
-        setTimeout(() => {
-          if (!cancelled) setDone(true);
-        }, 800);
+        // Function may still be running in background (timeout/fire-and-forget).
+        // Keep polling until progress shows done/error.
+        // The pollTimer is already running, just wait for it to detect completion.
       } catch (e) {
-        if (pollTimer) clearInterval(pollTimer);
         if (cancelled) return;
         
-        // Edge function may have timed out — check if products were saved incrementally
+        // Edge function may have timed out — keep polling
         const finalProgress = await pollScrapeProgress(runId);
         if (finalProgress && finalProgress.extracted_products > 0) {
           // Partial success: products were saved before timeout
+          if (pollTimer) clearInterval(pollTimer);
           setStage(3);
           setProgress({ ...finalProgress, status: "done" });
           setResult({
@@ -126,7 +145,10 @@ export function StepCrawl({ storeUrl, onComplete }: Props) {
           setTimeout(() => {
             if (!cancelled) setDone(true);
           }, 800);
+        } else if (finalProgress && finalProgress.status !== "error" && finalProgress.status !== "done") {
+          // Still running, keep polling
         } else {
+          if (pollTimer) clearInterval(pollTimer);
           setError(e instanceof Error ? e.message : "Unknown error");
         }
       }

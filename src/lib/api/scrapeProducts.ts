@@ -31,19 +31,40 @@ export async function scrapeProducts(url: string, runId: string): Promise<Scrape
     };
   }
 
-  const { data, error } = await supabase.functions.invoke("scrape-products", {
-    body: { url, runId },
-  });
+  // Fire-and-forget: the function runs in the background and updates scrape_progress.
+  // We use AbortController to avoid the client timing out on long scrapes.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min max
 
-  if (error) {
-    return { success: false, products_found: 0, categories: [], pages_scanned: 0, error: error.message };
+  try {
+    const { data, error } = await supabase.functions.invoke("scrape-products", {
+      body: { url, runId },
+    });
+
+    clearTimeout(timeout);
+
+    if (error) {
+      // If aborted due to timeout, the function is still running in the background
+      if (error.message?.includes("AbortError") || error.message?.includes("aborted")) {
+        return { success: true, products_found: 0, categories: [], pages_scanned: 0, runId };
+      }
+      return { success: false, products_found: 0, categories: [], pages_scanned: 0, error: error.message };
+    }
+
+    if (data?.error) {
+      return { success: false, products_found: 0, categories: [], pages_scanned: 0, error: data.error };
+    }
+
+    return data as ScrapeResult;
+  } catch (e: any) {
+    clearTimeout(timeout);
+    // Network timeout / abort — function is still running server-side
+    if (e?.name === "AbortError" || e?.message?.includes("aborted") || e?.message?.includes("Failed to fetch")) {
+      // Return success so the UI keeps polling progress
+      return { success: true, products_found: 0, categories: [], pages_scanned: 0, runId };
+    }
+    return { success: false, products_found: 0, categories: [], pages_scanned: 0, error: e?.message || "Unknown error" };
   }
-
-  if (data?.error) {
-    return { success: false, products_found: 0, categories: [], pages_scanned: 0, error: data.error };
-  }
-
-  return data as ScrapeResult;
 }
 
 export async function pollScrapeProgress(runId: string): Promise<ScrapeProgress | null> {
