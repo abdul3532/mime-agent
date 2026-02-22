@@ -13,11 +13,22 @@ import { ProductDetailDialog } from "./ProductDetailDialog";
 
 const PAGE_SIZE = 10;
 
+function extractDomain(url: string): string {
+  if (!url) return "Unknown";
+  try {
+    const u = url.startsWith("http") ? url : `https://${url}`;
+    return new URL(u).hostname.replace(/^www\./, "");
+  } catch {
+    return "Unknown";
+  }
+}
+
 export function ProductsSection() {
   const { products, setProducts, updateProduct, rescanning, scanStep, seedDemoProducts, seeding } = useDashboard();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [availFilter, setAvailFilter] = useState<string>("all");
+  const [storeFilter, setStoreFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -25,14 +36,20 @@ export function ProductsSection() {
   const { toast } = useToast();
   const categories = getCategories(products);
 
+  const stores = useMemo(() => {
+    const s = new Set(products.map((p) => extractDomain(p.url)));
+    return [...s].sort();
+  }, [products]);
+
   const filtered = useMemo(() => {
     return products.filter((p) => {
       if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
       if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
       if (availFilter !== "all" && p.availability !== availFilter) return false;
+      if (storeFilter !== "all" && extractDomain(p.url) !== storeFilter) return false;
       return true;
     });
-  }, [products, search, categoryFilter, availFilter]);
+  }, [products, search, categoryFilter, availFilter, storeFilter]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageProducts = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -136,11 +153,20 @@ export function ProductsSection() {
       <h2 className="font-heading text-2xl font-bold">Products</h2>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search products..." className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} />
         </div>
+        {stores.length > 1 && (
+          <Select value={storeFilter} onValueChange={(v) => { setStoreFilter(v); setPage(0); }}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Store" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All stores</SelectItem>
+              {stores.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(0); }}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
@@ -179,10 +205,10 @@ export function ProductsSection() {
                 <Checkbox checked={selected.size === pageProducts.length && pageProducts.length > 0} onCheckedChange={toggleAll} />
               </th>
               <th className="p-3">Product</th>
+              <th className="p-3 hidden md:table-cell">Store</th>
               <th className="p-3">Price</th>
               <th className="p-3 hidden md:table-cell">Availability</th>
               <th className="p-3 hidden lg:table-cell">Category</th>
-              <th className="p-3 hidden lg:table-cell">Margin</th>
               <th className="p-3 hidden lg:table-cell">Inventory</th>
               <th className="p-3 w-36">Boost</th>
             </tr>
@@ -214,6 +240,9 @@ export function ProductsSection() {
                     <span className="font-medium truncate max-w-[180px]">{p.title}</span>
                   </div>
                 </td>
+                <td className="p-3 hidden md:table-cell">
+                  <span className="text-xs text-muted-foreground truncate max-w-[120px] block">{extractDomain(p.url)}</span>
+                </td>
                 <td className="p-3 font-medium">{new Intl.NumberFormat(undefined, { style: 'currency', currency: p.currency || 'EUR' }).format(p.price)}</td>
                 <td className="p-3 hidden md:table-cell">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -225,7 +254,6 @@ export function ProductsSection() {
                   </span>
                 </td>
                 <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.category}</td>
-                <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.margin}%</td>
                 <td className="p-3 hidden lg:table-cell text-muted-foreground">{p.inventory}</td>
                 <td className="p-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-2">
