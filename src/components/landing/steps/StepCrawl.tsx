@@ -46,6 +46,15 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
       setAlreadyScanned(false);
       setProgress(null);
 
+      // Save store_id to profile immediately so the storefront endpoint works
+      if (user && storeId) {
+        const cleanDomain = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+        await supabase
+          .from("profiles")
+          .update({ store_id: storeId, store_url: storeUrl, domain: cleanDomain })
+          .eq("user_id", user.id);
+      }
+
       // Check if user already has products from this specific store URL
       if (user && storeUrl) {
         // Normalize the URL for matching (strip protocol and trailing slash)
@@ -100,14 +109,6 @@ export function StepCrawl({ storeUrl, storeId, onComplete }: Props) {
         setStage(3);
         setResult(res);
 
-        // Save store_id and store_url to user's profile
-        if (user && storeId) {
-          const cleanDomain = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
-          await supabase
-            .from("profiles")
-            .update({ store_id: storeId, store_url: storeUrl, domain: cleanDomain })
-            .eq("user_id", user.id);
-        }
 
         // Final progress fetch
         const finalProgress = await pollScrapeProgress(runId);
