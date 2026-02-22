@@ -128,7 +128,7 @@ export function WizardContainer() {
                     transition={{ duration: 0.3 }}
                     className={`flex items-center gap-3 p-3.5 rounded-xl text-sm font-medium transition-colors w-full text-left ${
                       status === "active" ? "bg-primary/10 text-primary" :
-                      status === "completed" ? "text-accent-foreground hover:bg-accent/10 cursor-pointer" : "text-muted-foreground cursor-default"
+                      status === "completed" ? "text-foreground hover:bg-accent/10 cursor-pointer" : "text-muted-foreground cursor-default"
                     }`}
                   >
                     {status === "completed" ? (
