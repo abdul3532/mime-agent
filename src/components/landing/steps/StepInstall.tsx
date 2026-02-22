@@ -109,11 +109,11 @@ export function StepInstall({ storeId, storeUrl }: Props) {
 
         {verifyResult && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 text-sm">
-            <div className={`flex items-center gap-2 ${verifyResult.endpoint_reachable ? "text-accent-foreground" : "text-destructive"}`}>
+            <div className={`flex items-center gap-2 ${verifyResult.endpoint_reachable ? "text-green-500" : "text-destructive"}`}>
               {verifyResult.endpoint_reachable ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {verifyResult.endpoint_reachable ? "MIME endpoint reachable" : "MIME endpoint not reachable"}
             </div>
-            <div className={`flex items-center gap-2 ${verifyResult.snippet_detected ? "text-accent-foreground" : "text-destructive"}`}>
+            <div className={`flex items-center gap-2 ${verifyResult.snippet_detected ? "text-green-500" : "text-destructive"}`}>
               {verifyResult.snippet_detected ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {verifyResult.snippet_detected ? "Link snippet detected — agents can discover your storefront." : "Link snippet not detected — add the tag and try again."}
             </div>
