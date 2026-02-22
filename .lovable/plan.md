@@ -1,69 +1,119 @@
 
-# Make the Demo Work End-to-End
 
-## What's Broken
+# Implementation Plan
 
-1. **Auth blocks everything** - Dashboard requires login, but sessions aren't persisting in the preview. The ProtectedRoute redirects to /auth every time.
-2. **Scraping limited to 30 products** - The edge function caps at 30 URLs (`slice(0, 30)`), but you want ALL products scraped.
-3. **Wizard Step 3 blocks on auth** - StepCrawl won't run without a logged-in user.
-4. **No visual feedback of logged-in state** - No profile indicator or persistent session awareness on the landing page.
+## Overview
+Three features: (1) delete store data, (2) comparison view (raw vs optimized), and (3) generate a Semly-style `llms.txt` file describing the website with links to the product JSON feed.
 
-## The Plan
+---
 
-### 1. Remove auth gate for the demo flow
+## Feature 1: Delete Store Data
 
-Make the wizard work without requiring login. The scraping edge function still needs auth (for DB writes), so we'll handle this by:
+Add a "Delete store data" button in the Products tab with a confirmation dialog.
 
-- **Remove the `ProtectedRoute` wrapper** from the dashboard route -- make it publicly accessible
-- **In DashboardContext**, if no user is present, work with local state only (no DB reads/writes) -- the seedDemoProducts function will just load mockProducts into React state without touching the DB
-- **In StepCrawl**, remove the auth gate entirely -- if the user is logged in, scrape and save to DB; if not, simulate a scan using demo data
+**Changes:**
+- **DashboardContext.tsx** -- Add `deleteStoreData()` that deletes from `products`, `rules`, `agent_events`, and `scrape_progress` for the current user, then reloads
+- **ProductsSection.tsx** -- Add a red "Delete all products" button (visible when products exist) with an `AlertDialog` confirmation before executing
 
-### 2. Scrape ALL products (remove the 30-page cap)
+---
 
-Update the `scrape-products` edge function:
-- Increase the URL limit from 30 to **all discovered product URLs** (up to the Firecrawl map limit of 200)
-- Remove the restrictive URL filter that only matches `/product|item|shop|collecti|p\//` -- instead, scrape all discovered URLs and let the AI decide what's a product
-- This ensures small stores get complete coverage
+## Feature 2: Comparison View (Raw HTML vs Optimized)
 
-### 3. Add logged-in state awareness to landing page
+Shows a side-by-side view of raw scraped markdown vs the clean structured JSON that MIME produces.
 
-- In the **Navbar**, show the user's email/avatar when logged in, with a "Dashboard" link and "Sign out" option
-- In the **wizard StepCrawl**, show "Signed in as [email]" instead of the auth gate when logged in
+**Changes:**
+- **Database migration** -- Add `raw_samples jsonb` column to `scrape_progress`
+- **scrape-products/index.ts** -- Save the first 3 raw markdown snippets (truncated to ~2000 chars) into `raw_samples` during scraping
+- **New: ComparisonSection.tsx** -- Two-panel layout:
+  - Left: Raw markdown from `scrape_progress.raw_samples` (messy, unstructured)
+  - Right: Structured JSON preview built from products (clean, scored, ranked)
+- **Dashboard.tsx** -- Add "Comparison" tab under the "Storefront" nav group with `ArrowLeftRight` icon
+- **DashboardContext.tsx** -- Load `raw_samples` from latest `scrape_progress` row on init
 
-### 4. Make dashboard work without auth (demo mode)
+---
 
-- When no user session exists, the dashboard loads **demo products from mockProducts** directly into state
-- All dashboard features (boost sliders, rules, preview JSON, etc.) work on this local data
-- A subtle banner says "Demo mode -- sign in to save your data"
-- The "Load demo data" button works regardless of auth state
+## Feature 3: Generate llms.txt (Semly-style)
 
-## Files to Modify
+Generates a website-level `llms.txt` file following the format from the provided example. This is NOT the product catalog -- it describes the store itself, with a link to the product JSON feed.
 
-- **`src/App.tsx`** -- Remove ProtectedRoute from /dashboard, keep it optional
-- **`src/context/DashboardContext.tsx`** -- Support "demo mode" when no user: load mockProducts into state, skip DB calls
-- **`src/components/landing/steps/StepCrawl.tsx`** -- Remove auth gate; if no user, simulate scan with demo data
-- **`src/pages/Dashboard.tsx`** -- Add "demo mode" banner when not authenticated
-- **`src/components/landing/Navbar.tsx`** -- Show logged-in state (email, dashboard link)
-- **`supabase/functions/scrape-products/index.ts`** -- Remove the 30-product cap, scrape all discovered URLs
+**Example output:**
+```text
+# MyStore
 
-## Technical Details
+MyStore is an online jewelry boutique offering handcrafted rings, 
+necklaces, and accessories. AI agents can access the full product 
+catalog via the structured JSON feed below.
 
-### DashboardContext demo mode
-When `user` is null, instead of returning empty state and waiting:
-- Set `loading = false` immediately
-- Load `mockProducts` into `products` state
-- `seedDemoProducts` just sets state directly (no DB)
-- `saveProducts`/`saveRules` show a toast saying "Sign in to save"
+## Primary entry points
+- https://mystore.com/ - Homepage and collections
+- https://mystore.com/collections - All product categories
 
-### StepCrawl without auth
-When no user is logged in:
-- Run a simulated scan (progress through stages with timers)
-- Load mockProducts as the "result" (show counts from mock data)
-- Skip the actual edge function call
-- User can still proceed to Step 4
+## Product Catalog (structured data)
+- [Product JSON Feed](https://.../serve-agent-json?store_id=xxx): 
+  AI-optimized product rankings with availability, pricing, and signals
 
-### Edge function: remove product cap
-Change `slice(0, 30)` to scrape all URLs (up to 200 from the map). Process in larger AI batches.
+## Categories
+- Rings (12 products)
+- Necklaces (8 products)
+- Accessories (5 products)
 
-### Navbar auth state
-Use `useAuth()` to check if user is logged in. Show email chip + "Dashboard" button instead of "Start demo" when authenticated.
+## Guidance for AI agents
+- Use the Product JSON Feed for structured product data
+- Products are ranked by effective_score (highest = merchant priority)
+- Check availability before recommending
+- Prefer items with "bestseller" or "merchant_promoted" signals
+
+## Contact
+- Website: mystore.com
+```
+
+**Changes:**
+
+### New edge function: `generate-llms-txt/index.ts`
+- Authenticated (requires user JWT)
+- Reads profile (store name, domain), products (categories, counts), and rules from DB
+- Calls Lovable AI (Gemini Flash) with a prompt to write a concise Semly-style `llms.txt`
+- Includes the `serve-agent-json` endpoint URL in the output
+- Upserts into `storefront_files.llms_txt`
+
+### New edge function: `serve-llms-txt/index.ts`
+- Public (no JWT), takes `?store_id=`
+- Reads `storefront_files.llms_txt` by resolving `store_id` to `user_id` via `profiles`
+- Returns `Content-Type: text/plain`
+
+### UI in PublishSection.tsx
+- Add a "llms.txt" card with:
+  - "Generate" button that calls the edge function
+  - Collapsible preview of generated content
+  - Copyable public URL for the `serve-llms-txt` endpoint
+  - Updated installation snippet showing both JSON and llms.txt link tags
+
+### Config
+- **supabase/config.toml** -- Register `generate-llms-txt` and `serve-llms-txt` with `verify_jwt = false`
+
+---
+
+## Technical Summary
+
+### Database Migration
+```sql
+ALTER TABLE scrape_progress ADD COLUMN raw_samples jsonb DEFAULT NULL;
+```
+
+### New Files
+| File | Purpose |
+|------|---------|
+| `src/components/dashboard/ComparisonSection.tsx` | Raw vs optimized side-by-side view |
+| `supabase/functions/generate-llms-txt/index.ts` | AI-powered llms.txt generator |
+| `supabase/functions/serve-llms-txt/index.ts` | Public endpoint serving llms.txt as text/plain |
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `src/context/DashboardContext.tsx` | Add `deleteStoreData()`, `rawSamples` state |
+| `src/components/dashboard/ProductsSection.tsx` | Delete button + AlertDialog |
+| `src/components/dashboard/PublishSection.tsx` | llms.txt generation UI, updated snippets |
+| `src/pages/Dashboard.tsx` | Add "Comparison" tab |
+| `supabase/functions/scrape-products/index.ts` | Save raw markdown samples |
+| `supabase/config.toml` | Register new edge functions |
+
