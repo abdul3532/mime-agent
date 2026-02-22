@@ -15,8 +15,9 @@ export function StepInstall({ storeId }: Props) {
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
 
-  const endpoint = `https://mime.ai/storefront/${storeId}/agent.json`;
-  const productsEndpoint = `https://mime.ai/storefront/${storeId}/products.json`;
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "paijyobnnrcidapjqcln";
+  const endpoint = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${storeId}`;
+  const productsEndpoint = endpoint;
   const snippet = `<link rel="alternate" type="application/json" href="${endpoint}" />`;
 
   const copyToClipboard = (text: string, label: string) => {

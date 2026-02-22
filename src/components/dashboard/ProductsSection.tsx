@@ -237,7 +237,18 @@ export function ProductsSection() {
                     <div className={`w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0 ${p.image ? 'hidden' : ''}`}>
                       <Package className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <span className="font-medium truncate max-w-[180px]">{p.title}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-medium truncate max-w-[180px]">{p.title}</span>
+                      {p.tags.includes("bestseller") && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium shrink-0">★ Best</span>
+                      )}
+                      {p.availability === "low_stock" && p.inventory <= 10 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium shrink-0">Low</span>
+                      )}
+                      {p.inventory === 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium shrink-0">OOS</span>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="p-3 hidden md:table-cell">

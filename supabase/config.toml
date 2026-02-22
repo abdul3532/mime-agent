@@ -2,3 +2,6 @@ project_id = "paijyobnnrcidapjqcln"
 
 [functions.scrape-products]
 verify_jwt = false
+
+[functions.serve-agent-json]
+verify_jwt = false

@@ -23,7 +23,8 @@ export function PublishSection({ storeId }: Props) {
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const endpoint = `https://mime.ai/storefront/${storeId}/agent.json`;
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "paijyobnnrcidapjqcln";
+  const endpoint = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${storeId}`;
   const snippet = `<link rel="alternate" type="application/json" href="${endpoint}" />`;
 
   const copy = (text: string, label: string) => {
