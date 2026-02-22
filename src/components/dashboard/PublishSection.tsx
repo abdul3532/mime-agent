@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, CheckCircle2, XCircle, Rocket, Save } from "lucide-react";
+import { Copy, CheckCircle2, XCircle, Rocket, Save, FileText, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Props {
   storeId: string;
@@ -22,10 +23,14 @@ export function PublishSection({ storeId }: Props) {
   const [publishing, setPublishing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [generatingLlms, setGeneratingLlms] = useState(false);
+  const [llmsTxt, setLlmsTxt] = useState<string | null>(null);
+  const [llmsPreviewOpen, setLlmsPreviewOpen] = useState(false);
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "paijyobnnrcidapjqcln";
   const endpoint = `https://${projectId}.supabase.co/functions/v1/serve-agent-json?store_id=${storeId}`;
-  const snippet = `<link rel="alternate" type="application/json" href="${endpoint}" />`;
+  const llmsEndpoint = `https://${projectId}.supabase.co/functions/v1/serve-llms-txt?store_id=${storeId}`;
+  const snippet = `<link rel="alternate" type="application/json" href="${endpoint}" />\n<link rel="alternate" type="text/plain" href="${llmsEndpoint}" title="llms.txt" />`;
   const trackBase = `https://${projectId}.supabase.co/functions/v1/track-event`;
 
   const pixelSnippet = `<!-- MIME Tracking Pixel — paste before </body> -->
@@ -66,15 +71,40 @@ export function PublishSection({ storeId }: Props) {
     setSaving(false);
   };
 
+  const handleGenerateLlms = async () => {
+    setGeneratingLlms(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-llms-txt");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setLlmsTxt(data.llms_txt);
+      setLlmsPreviewOpen(true);
+      toast({ title: "Generated!", description: "llms.txt has been created." });
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Failed to generate", variant: "destructive" });
+    } finally {
+      setGeneratingLlms(false);
+    }
+  };
+
+  // Load existing llms.txt on mount
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("storefront_files")
+      .select("llms_txt")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.llms_txt) setLlmsTxt(data.llms_txt);
+      });
+  }, [user]);
+
   const handlePublish = async () => {
     setConfirmOpen(false);
     setPublishing(true);
-
-    // Save to DB first
     await saveProducts();
     await saveRules();
-
-    // Record publish in history
     if (user) {
       const snapshot = {
         products: products.filter((p) => p.included).map((p) => ({
@@ -83,12 +113,8 @@ export function PublishSection({ storeId }: Props) {
         rules: rules.map((r) => ({ name: r.name, action: r.action })),
         published_at: new Date().toISOString(),
       };
-      await supabase.from("publish_history").insert({
-        user_id: user.id,
-        snapshot,
-      });
+      await supabase.from("publish_history").insert({ user_id: user.id, snapshot });
     }
-
     setTimeout(() => {
       setPublishing(false);
       toast({ title: "Published!", description: "Your storefront changes are live." });
@@ -114,6 +140,44 @@ export function PublishSection({ storeId }: Props) {
             <Copy className="h-4 w-4" />
           </button>
         </div>
+      </div>
+
+      {/* llms.txt */}
+      <div className="card-elevated p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <FileText className="h-4 w-4" /> llms.txt
+          </h3>
+          <Button size="sm" variant="outline" onClick={handleGenerateLlms} disabled={generatingLlms}>
+            {generatingLlms ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Generating...</> : llmsTxt ? "Regenerate" : "Generate"}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          AI-readable description of your store for LLM discovery. Not the product catalog — links to your JSON feed.
+        </p>
+        {llmsTxt && (
+          <>
+            <div className="code-block flex items-center justify-between gap-2">
+              <code className="text-xs break-all">{llmsEndpoint}</code>
+              <button onClick={() => copy(llmsEndpoint, "llms.txt URL")} className="shrink-0 text-muted-foreground hover:text-foreground">
+                <Copy className="h-4 w-4" />
+              </button>
+            </div>
+            <Collapsible open={llmsPreviewOpen} onOpenChange={setLlmsPreviewOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full justify-between text-xs">
+                  Preview content
+                  {llmsPreviewOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono bg-muted/30 rounded-lg p-3 max-h-64 overflow-y-auto mt-2">
+                  {llmsTxt}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
+          </>
+        )}
       </div>
 
       {/* Snippet */}

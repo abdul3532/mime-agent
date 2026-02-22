@@ -4,7 +4,7 @@ import mimeLogo from "@/assets/mime-logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Package, SlidersHorizontal, Eye, Rocket, RefreshCw, ArrowLeft,
-  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User, Bot,
+  Search, Bell, Settings, HelpCircle, Sun, Moon, LogOut, User, Bot, ArrowLeftRight,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +16,7 @@ import { RulesSection } from "@/components/dashboard/RulesSection";
 import { PreviewSection } from "@/components/dashboard/PreviewSection";
 import { PublishSection } from "@/components/dashboard/PublishSection";
 import { AgentAnalyticsSection } from "@/components/dashboard/AgentAnalyticsSection";
+import { ComparisonSection } from "@/components/dashboard/ComparisonSection";
 import { GlobalSearchCommand } from "@/components/dashboard/GlobalSearchCommand";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,6 +33,7 @@ const navGroups = [
     items: [
       { id: "products", label: "Products", icon: Package },
       { id: "rules", label: "Rules & Priorities", icon: SlidersHorizontal },
+      { id: "comparison", label: "Comparison", icon: ArrowLeftRight },
       { id: "preview", label: "Preview", icon: Eye },
     ],
   },
@@ -224,6 +226,7 @@ function DashboardInner() {
               {activeTab === "agent-analytics" && <AgentAnalyticsSection />}
               {activeTab === "products" && <ProductsSection />}
               {activeTab === "rules" && <RulesSection />}
+              {activeTab === "comparison" && <ComparisonSection />}
               {activeTab === "preview" && <PreviewSection storeId={storeId} />}
               {activeTab === "publish" && <PublishSection storeId={storeId} />}
             </motion.div>

@@ -204,6 +204,13 @@ Deno.serve(async (req) => {
 
     console.log(`Scraped ${scrapedPages.length} pages successfully`);
 
+    // Save raw samples (first 3 pages, truncated)
+    const rawSamples = scrapedPages.slice(0, 3).map((p) => ({
+      url: p.url,
+      markdown: p.markdown.substring(0, 2000),
+    }));
+    await updateProgress({ raw_samples: rawSamples });
+
     if (scrapedPages.length === 0) {
       await updateProgress({ status: "done", scraped_pages: 0 });
       return new Response(

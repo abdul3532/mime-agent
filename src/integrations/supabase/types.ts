@@ -226,6 +226,7 @@ export type Database = {
           error_message: string | null
           extracted_products: number
           id: string
+          raw_samples: Json | null
           run_id: string
           scraped_pages: number
           status: string
@@ -238,6 +239,7 @@ export type Database = {
           error_message?: string | null
           extracted_products?: number
           id?: string
+          raw_samples?: Json | null
           run_id: string
           scraped_pages?: number
           status?: string
@@ -250,6 +252,7 @@ export type Database = {
           error_message?: string | null
           extracted_products?: number
           id?: string
+          raw_samples?: Json | null
           run_id?: string
           scraped_pages?: number
           status?: string

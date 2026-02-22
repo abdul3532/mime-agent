@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.serve-agent-json]
 verify_jwt = false
+
+[functions.generate-llms-txt]
+verify_jwt = false
+
+[functions.serve-llms-txt]
+verify_jwt = false

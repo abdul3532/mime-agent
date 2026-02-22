@@ -7,9 +7,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronLeft, ChevronRight, RefreshCw, Package } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RefreshCw, Package, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProductDetailDialog } from "./ProductDetailDialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const PAGE_SIZE = 10;
 
@@ -24,7 +28,7 @@ function extractDomain(url: string): string {
 }
 
 export function ProductsSection() {
-  const { products, setProducts, updateProduct, rescanning, scanStep, seedDemoProducts, seeding, computeEffectiveScore } = useDashboard();
+  const { products, setProducts, updateProduct, rescanning, scanStep, seedDemoProducts, seeding, computeEffectiveScore, deleteStoreData, deleting } = useDashboard();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [availFilter, setAvailFilter] = useState<string>("all");
@@ -150,7 +154,32 @@ export function ProductsSection() {
 
   return (
     <div className="space-y-4">
-      <h2 className="font-heading text-2xl font-bold">Products</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-2xl font-bold">Products</h2>
+        {products.length > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete all data
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete all store data?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete all products, rules, and associated data. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={deleteStoreData} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {deleting ? "Deleting..." : "Delete everything"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
