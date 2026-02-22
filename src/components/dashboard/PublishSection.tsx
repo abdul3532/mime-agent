@@ -246,15 +246,15 @@ export function PublishSection({ storeId }: Props) {
         </Button>
         {verifyResult && (
           <div className="space-y-2 text-sm">
-            <div className={`flex items-center gap-2 font-medium ${verifyResult.endpoint_reachable ? "text-primary" : "text-destructive"}`}>
+            <div className={`flex items-center gap-2 font-medium ${verifyResult.endpoint_reachable ? "text-green-500" : "text-destructive"}`}>
               {verifyResult.endpoint_reachable ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {verifyResult.endpoint_reachable ? "MIME endpoint reachable" : "MIME endpoint not reachable"}
             </div>
-            <div className={`flex items-center gap-2 font-medium ${verifyResult.snippet_detected ? "text-primary" : "text-destructive"}`}>
+            <div className={`flex items-center gap-2 font-medium ${verifyResult.snippet_detected ? "text-green-500" : "text-destructive"}`}>
               {verifyResult.snippet_detected ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {verifyResult.snippet_detected ? "Agent JSON link detected" : "Agent JSON link not detected — add the tag and try again"}
             </div>
-            <div className={`flex items-center gap-2 font-medium ${verifyResult.llms_snippet_detected ? "text-primary" : "text-muted-foreground"}`}>
+            <div className={`flex items-center gap-2 font-medium ${verifyResult.llms_snippet_detected ? "text-green-500" : "text-muted-foreground"}`}>
               {verifyResult.llms_snippet_detected ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {verifyResult.llms_snippet_detected ? "llms.txt link detected" : "llms.txt link not detected (optional)"}
             </div>
