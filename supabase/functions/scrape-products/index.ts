@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
               },
               body: JSON.stringify({
                 url: pUrl,
-                formats: ["markdown"],
+                formats: ["markdown", "html"],
                 onlyMainContent: true,
                 waitFor: 5000,
               }),
@@ -190,8 +190,31 @@ Deno.serve(async (req) => {
 
             const scrapeData = await scrapeRes.json();
             const markdown = scrapeData?.data?.markdown || scrapeData?.markdown;
+            const html = scrapeData?.data?.html || scrapeData?.html || "";
+            
+            // Extract image URLs from HTML to supplement markdown
+            const imgUrls: string[] = [];
+            const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+            let match;
+            while ((match = imgRegex.exec(html)) !== null) {
+              const src = match[1];
+              if (src && !src.includes("data:") && !src.includes("svg+xml") && !src.includes("pixel") && !src.includes("spacer")) {
+                imgUrls.push(src);
+              }
+            }
+            // Also check srcset and data-src for lazy-loaded images
+            const lazySrcRegex = /(?:data-src|data-lazy-src|data-original)=["']([^"']+)["']/gi;
+            while ((match = lazySrcRegex.exec(html)) !== null) {
+              if (match[1] && !match[1].includes("data:")) {
+                imgUrls.push(match[1]);
+              }
+            }
+            
             if (markdown) {
-              return { url: pUrl, markdown: markdown.substring(0, 5000) };
+              const imageContext = imgUrls.length > 0 
+                ? `\n\nIMAGES FOUND ON PAGE:\n${[...new Set(imgUrls)].slice(0, 20).join("\n")}` 
+                : "";
+              return { url: pUrl, markdown: markdown.substring(0, 4000) + imageContext };
             }
           } catch (e) {
             console.error(`Failed to scrape ${pUrl}:`, e);
@@ -275,10 +298,12 @@ Each product object must have:
 - currency (string, e.g. "EUR", "USD")
 - category (string, infer from breadcrumbs or content)
 - availability (string: "in_stock", "out_of_stock", or "preorder")
-- image (string, absolute URL of the main product image, or null)
+- image (string, absolute URL of the main product image, or null. IMPORTANT: Look for image URLs in the "IMAGES FOUND ON PAGE" section at the end of each page's content. Pick the largest/most relevant product image, not icons or logos. Prefer URLs containing "product", "cdn", or the product name. Always return absolute URLs starting with http.)
 - tags (string array, relevant keywords)
 - inventory (number, estimate 100 if not specified)
 - url (string, the page URL)
+
+IMPORTANT FOR IMAGES: Each page may have an "IMAGES FOUND ON PAGE" section listing image URLs extracted from the HTML. Use these to find the correct product image. Match the image to the product by looking at the filename or path.
 
 Extract ALL products found on each page. If a page lists multiple products (e.g. collection page), extract each one individually.
 Skip non-product pages (about, contact, FAQ, etc). Return [] if no products found.`,
